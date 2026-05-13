@@ -1,11 +1,7 @@
-import pytest
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-
 from app.models import Agent, Conversation, Message, LLMProvider
 
 
-@pytest.mark.asyncio
-async def test_agent_creation():
+def test_agent_creation():
     agent = Agent(name="Test", model="gpt-4o", tools=[], temperature=0.7)
     assert agent.name == "Test"
     assert agent.model == "gpt-4o"
@@ -13,8 +9,7 @@ async def test_agent_creation():
     assert agent.temperature == 0.7
 
 
-@pytest.mark.asyncio
-async def test_conversation_fields():
+def test_conversation_fields():
     conv = Conversation(title="Hello")
     assert conv.title == "Hello"
 

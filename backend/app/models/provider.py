@@ -2,15 +2,13 @@ import uuid
 from datetime import datetime
 from sqlalchemy import String, Boolean, JSON, DateTime, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID
-
 from app.database import Base
 
 
 class LLMProvider(Base):
     __tablename__ = "llm_providers"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     provider: Mapped[str] = mapped_column(String(50), nullable=False)
     api_base: Mapped[str] = mapped_column(String(512), nullable=False)

@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings
 
 
 class Settings(BaseSettings):
-    database_url: str = "postgresql+asyncpg://agent:agent123@localhost:5432/agent_platform"
+    database_url: str = "sqlite+aiosqlite:///./agent_platform.db"
     secret_key: str = "dev-secret-key-change-in-production"
     llm_timeout: int = 60
     tool_timeout: int = 30
