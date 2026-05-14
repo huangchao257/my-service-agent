@@ -10,6 +10,24 @@ from app.schemas.provider import ProviderCreate, ProviderUpdate, ProviderRespons
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 
 
+@router.get("/models")
+async def list_available_models(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(
+        select(LLMProvider).where(LLMProvider.is_active == True)
+    )
+    providers = result.scalars().all()
+    models: list[dict] = []
+    for p in providers:
+        for m in p.models:
+            models.append({
+                "value": f"{p.name}/{m}",
+                "label": f"{p.provider}/{m}",
+                "provider_name": p.name,
+                "provider_id": str(p.id),
+            })
+    return models
+
+
 @router.get("", response_model=list[ProviderResponse])
 async def list_providers(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(LLMProvider).order_by(LLMProvider.created_at.desc()))

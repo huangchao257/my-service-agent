@@ -1,0 +1,48 @@
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_db
+from app.models.skill import Skill
+from app.schemas.skill import SkillCreate, SkillUpdate, SkillResponse
+
+router = APIRouter(prefix="/api/skills", tags=["skills"])
+
+
+@router.get("", response_model=list[SkillResponse])
+async def list_skills(db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Skill).order_by(Skill.created_at.desc()))
+    return result.scalars().all()
+
+
+@router.post("", response_model=SkillResponse, status_code=201)
+async def create_skill(data: SkillCreate, db: AsyncSession = Depends(get_db)):
+    skill = Skill(**data.model_dump())
+    db.add(skill)
+    await db.commit()
+    await db.refresh(skill)
+    return skill
+
+
+@router.put("/{skill_id}", response_model=SkillResponse)
+async def update_skill(skill_id: UUID, data: SkillUpdate, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Skill).where(Skill.id == skill_id))
+    skill = result.scalar_one_or_none()
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill not found")
+    for key, value in data.model_dump(exclude_unset=True).items():
+        setattr(skill, key, value)
+    await db.commit()
+    await db.refresh(skill)
+    return skill
+
+
+@router.delete("/{skill_id}", status_code=204)
+async def delete_skill(skill_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Skill).where(Skill.id == skill_id))
+    skill = result.scalar_one_or_none()
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill not found")
+    await db.delete(skill)
+    await db.commit()

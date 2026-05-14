@@ -16,7 +16,8 @@ export function useSSE() {
       onToolCall: (name: string, args: string) => void,
       onToolResult: (tool: string, output: string) => void,
       onDone: () => void,
-      onError: (msg: string) => void
+      onError: (msg: string) => void,
+      onTitleUpdated?: (title: string) => void,
     ) => {
       setIsStreaming(true);
       const abort = new AbortController();
@@ -67,6 +68,9 @@ export function useSSE() {
                 onToolResult(parsed.tool, parsed.output);
               } else if (eventType === "done") {
                 onDone();
+              } else if (eventType === "title_updated") {
+                const parsed = JSON.parse(data);
+                onTitleUpdated?.(parsed.title);
               } else if (eventType === "error") {
                 const parsed = JSON.parse(data);
                 onError(parsed.message);

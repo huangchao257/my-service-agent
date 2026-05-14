@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageSquare, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -12,9 +12,10 @@ interface ConversationListProps {
   activeId: string | null;
   onSelect: (conv: Conversation) => void;
   onNew: () => void;
+  refreshKey: number;
 }
 
-export function ConversationList({ agentId, activeId, onSelect, onNew }: ConversationListProps) {
+export function ConversationList({ agentId, activeId, onSelect, onNew, refreshKey }: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
 
   useEffect(() => {
@@ -23,45 +24,45 @@ export function ConversationList({ agentId, activeId, onSelect, onNew }: Convers
     } else {
       setConversations([]);
     }
-  }, [agentId]);
+  }, [agentId, refreshKey]);
 
-  const groupByDate = (convs: Conversation[]) => {
+  const handleDelete = useCallback(async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    await api.deleteConversation(id);
+    setConversations((prev) => prev.filter((c) => c.id !== id));
+  }, []);
+
+  const groups = useMemo(() => {
     const groups: Record<string, Conversation[]> = { Today: [], Yesterday: [], Earlier: [] };
-    convs.forEach((c) => {
+    conversations.forEach((c) => {
       const d = new Date(c.created_at);
       if (isToday(d)) groups["Today"].push(c);
       else if (isYesterday(d)) groups["Yesterday"].push(c);
       else groups["Earlier"].push(c);
     });
     return Object.entries(groups).filter(([, v]) => v.length > 0);
-  };
-
-  const handleDelete = async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
-    await api.deleteConversation(id);
-    setConversations((prev) => prev.filter((c) => c.id !== id));
-  };
+  }, [conversations]);
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-3">
-        <Button className="w-full" onClick={onNew} disabled={!agentId}>
+        <Button className="w-full rounded-xl" onClick={onNew} disabled={!agentId} size="sm">
           <Plus className="mr-2 h-4 w-4" />New Chat
         </Button>
       </div>
-      <ScrollArea className="flex-1 px-3">
-        {groupByDate(conversations).map(([group, convs]) => (
+      <ScrollArea className="flex-1 px-3 custom-scrollbar">
+        {groups.map(([group, convs]) => (
           <div key={group} className="mb-3">
-            <p className="text-xs text-muted-foreground px-2 mb-1">{group}</p>
+            <p className="text-xs text-muted-foreground px-2 mb-1 font-medium">{group}</p>
             {convs.map((conv) => (
               <div key={conv.id}
-                className={`flex items-center group rounded-md px-2 py-1.5 cursor-pointer text-sm hover:bg-accent ${activeId === conv.id ? "bg-accent" : ""}`}
+                className={`flex items-center group rounded-lg px-2 py-1.5 cursor-pointer text-sm transition-colors animate-slide-in ${activeId === conv.id ? "bg-accent text-accent-foreground" : "hover:bg-accent/50 text-muted-foreground hover:text-foreground"}`}
                 onClick={() => onSelect(conv)}>
-                <MessageSquare className="mr-2 h-4 w-4 shrink-0 text-muted-foreground" />
+                <MessageSquare className="mr-2 h-4 w-4 shrink-0" />
                 <span className="truncate flex-1">{conv.title}</span>
-                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                <Button variant="ghost" size="icon" className="h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
                   onClick={(e) => handleDelete(e, conv.id)}>
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3 w-3 text-muted-foreground hover:text-destructive" />
                 </Button>
               </div>
             ))}

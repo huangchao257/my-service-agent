@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Wrench, ChevronDown, ChevronRight } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { memo, useState } from "react";
+import { Wrench, ChevronDown, Loader2 } from "lucide-react";
 
 interface ToolCallCardProps {
   name: string;
@@ -11,30 +10,41 @@ interface ToolCallCardProps {
   isExecuting?: boolean;
 }
 
-export function ToolCallCard({ name, args, output, isExecuting }: ToolCallCardProps) {
-  const [expanded, setExpanded] = useState(false);
+export const ToolCallCard = memo(function ToolCallCard({ name, args, output, isExecuting }: ToolCallCardProps) {
+  const [expanded, setExpanded] = useState(isExecuting || false);
+
   return (
-    <div className="flex justify-start py-2">
-      <Card className="max-w-[70%] border-amber-200 bg-amber-50 dark:bg-amber-950 dark:border-amber-800">
-        <CardContent className="p-3">
-          <button className="flex items-center gap-2 text-sm font-medium text-amber-700 dark:text-amber-400 w-full"
-            onClick={() => setExpanded(!expanded)}>
-            <Wrench className="h-4 w-4" />
-            {isExecuting ? `Calling ${name}...` : `Called ${name}`}
-            {output && (expanded ? <ChevronDown className="h-4 w-4 ml-auto" /> : <ChevronRight className="h-4 w-4 ml-auto" />)}
-          </button>
-          {expanded && (
-            <div className="mt-2 text-xs space-y-1">
-              <div><span className="font-medium">Args:</span> <code className="bg-amber-100 dark:bg-amber-900 px-1 rounded">{args}</code></div>
-              {output && (
-                <div><span className="font-medium">Result:</span>
-                  <pre className="mt-1 bg-amber-100 dark:bg-amber-900 p-2 rounded text-xs whitespace-pre-wrap">{output}</pre>
-                </div>
-              )}
-            </div>
+    <div className="flex justify-start py-1.5 animate-fade-in">
+      <div className="max-w-[75%] rounded-xl border border-primary/20 bg-primary/5 px-3 py-2">
+        <button
+          className="flex items-center gap-2 text-sm font-medium text-primary w-full"
+          onClick={() => setExpanded(!expanded)}
+        >
+          {isExecuting ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Wrench className="h-3.5 w-3.5" />
           )}
-        </CardContent>
-      </Card>
+          <span>{isExecuting ? `Calling ${name}...` : `Called ${name}`}</span>
+          <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
+        </button>
+        {expanded && (
+          <div className="mt-2 text-xs space-y-1.5 animate-fade-in">
+            {args && (
+              <div>
+                <span className="font-medium text-muted-foreground">Args: </span>
+                <code className="bg-muted px-1.5 py-0.5 rounded text-xs">{args}</code>
+              </div>
+            )}
+            {output && (
+              <div>
+                <span className="font-medium text-muted-foreground">Result: </span>
+                <pre className="mt-1 bg-muted p-2 rounded-md text-xs whitespace-pre-wrap max-h-40 overflow-y-auto custom-scrollbar">{output}</pre>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
     </div>
   );
-}
+});

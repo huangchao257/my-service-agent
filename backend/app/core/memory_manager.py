@@ -1,5 +1,6 @@
 import json
 import math
+from uuid import UUID
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +20,7 @@ class MemoryManager:
             return 0.0
         return dot / (norm_a * norm_b)
 
-    async def retrieve(self, db: AsyncSession, agent_id: str, query: str) -> list[str]:
+    async def retrieve(self, db: AsyncSession, agent_id: UUID, query: str) -> list[str]:
         try:
             embedding = await llm_gateway.get_embedding(query)
         except Exception:
@@ -40,9 +41,9 @@ class MemoryManager:
         scored.sort(key=lambda x: x[0], reverse=True)
         return [content for _, content in scored[:settings.memory_top_k]]
 
-    async def store(self, db: AsyncSession, agent_id: str, content: str):
+    async def store(self, db: AsyncSession, agent_id: UUID, content: str, conversation_id: UUID | None = None, api_base: str | None = None, api_key: str | None = None):
         try:
-            embedding = await llm_gateway.get_embedding(content)
+            embedding = await llm_gateway.get_embedding(content, api_base=api_base, api_key=api_key)
         except Exception:
             return
 
@@ -63,13 +64,14 @@ class MemoryManager:
 
         if best_memory and best_score > 0.95:
             best_memory.content = content
+            best_memory.conversation_id = conversation_id
             best_memory.embedding_json = json.dumps(embedding)
         else:
-            memory = Memory(agent_id=agent_id, content=content, embedding_json=json.dumps(embedding))
+            memory = Memory(agent_id=agent_id, conversation_id=conversation_id, content=content, embedding_json=json.dumps(embedding))
             db.add(memory)
         await db.commit()
 
-    async def extract_and_store(self, db: AsyncSession, agent_id: str, messages: list[dict]):
+    async def extract_and_store(self, db: AsyncSession, agent_id: UUID, messages: list[dict], conversation_id: UUID | None = None, model: str = "gpt-4o-mini", api_base: str | None = None, api_key: str | None = None):
         text = "\n".join(f"{m['role']}: {m['content']}" for m in messages[-6:])
         prompt = (
             "Extract 1-3 key facts about the user from this conversation. "
@@ -79,15 +81,16 @@ class MemoryManager:
         )
         try:
             response = await llm_gateway.chat_completion(
-                model="gpt-4o-mini",
+                model=model,
                 messages=[{"role": "user", "content": prompt}],
                 stream=False,
+                api_base=api_base, api_key=api_key,
             )
             facts = response.content.strip().split("\n") if hasattr(response, 'content') else []
             for fact in facts:
                 fact = fact.strip()
                 if fact and len(fact) > 5:
-                    await self.store(db, agent_id, fact)
+                    await self.store(db, agent_id, fact, conversation_id, api_base=api_base, api_key=api_key)
         except Exception:
             pass
 

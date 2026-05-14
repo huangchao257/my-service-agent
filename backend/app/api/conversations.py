@@ -45,3 +45,12 @@ async def get_messages(conversation_id: UUID, db: AsyncSession = Depends(get_db)
         select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at.asc())
     )
     return result.scalars().all()
+
+
+@router.get("/{conversation_id}", response_model=ConversationResponse)
+async def get_conversation(conversation_id: UUID, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
+    conv = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conv
