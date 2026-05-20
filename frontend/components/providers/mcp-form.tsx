@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * MCPForm — MCP Server 配置创建/编辑弹窗
+ *
+ * 根据 transport 类型动态显示不同的配置字段：
+ * - stdio: Command + Args (JSON) + Env (JSON)
+ * - sse: URL + Env (JSON)
+ */
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -45,6 +53,8 @@ export function MCPForm({ open, onClose, onSave, server }: MCPFormProps) {
         <DialogHeader><DialogTitle>{server ? "Edit MCP Server" : "Add MCP Server"}</DialogTitle></DialogHeader>
         <div className="space-y-4">
           <div><label className="text-sm font-medium">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="My MCP Server" /></div>
+
+          {/* 传输方式选择 */}
           <div>
             <label className="text-sm font-medium">Transport</label>
             <select className="w-full mt-1 rounded-md border px-3 py-2 text-sm" value={transport} onChange={(e) => setTransport(e.target.value)}>
@@ -52,15 +62,20 @@ export function MCPForm({ open, onClose, onSave, server }: MCPFormProps) {
               <option value="sse">sse</option>
             </select>
           </div>
+
+          {/* stdio 模式：命令 + 参数 */}
           {transport === "stdio" && (
             <>
               <div><label className="text-sm font-medium">Command</label><Input value={command} onChange={(e) => setCommand(e.target.value)} placeholder="npx or python or uvx" /></div>
               <div><label className="text-sm font-medium">Args (JSON array)</label><Input value={argsJson} onChange={(e) => setArgsJson(e.target.value)} placeholder='["-m", "my_mcp_server"]' /></div>
             </>
           )}
+
+          {/* sse 模式：URL */}
           {transport === "sse" && (
             <div><label className="text-sm font-medium">URL</label><Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="http://localhost:3001/sse" /></div>
           )}
+
           <div><label className="text-sm font-medium">Env (JSON)</label><Textarea value={envJson} onChange={(e) => setEnvJson(e.target.value)} placeholder='{"KEY": "value"}' rows={3} /></div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />Active

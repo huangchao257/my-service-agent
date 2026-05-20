@@ -1,5 +1,19 @@
 "use client";
 
+/**
+ * SSE Hook — 管理与后端流式聊天的连接
+ *
+ * 解析 SSE (Server-Sent Events) 协议的事件流：
+ *   delta → 文本增量
+ *   tool_call → 工具调用
+ *   tool_result → 工具结果
+ *   title_updated → 会话标题更新
+ *   done → 对话完成
+ *   error → 错误
+ *
+ * 提供 startStream 和 stopStream 方法，支持取消正在进行的请求。
+ */
+
 import { useCallback, useRef, useState } from "react";
 
 export function useSSE() {
@@ -43,13 +57,14 @@ export function useSSE() {
         const decoder = new TextDecoder();
         let buffer = "";
 
+        // SSE 协议解析循环
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+          buffer = lines.pop() || "";  // 保留未完成的行
 
           let eventType = "";
           for (const line of lines) {
@@ -57,6 +72,7 @@ export function useSSE() {
               eventType = line.slice(7).trim();
             } else if (line.startsWith("data: ")) {
               const data = line.slice(6);
+              // 根据事件类型分发到不同的回调
               if (eventType === "delta") {
                 const parsed = JSON.parse(data);
                 onDelta(parsed.content);
@@ -79,6 +95,7 @@ export function useSSE() {
           }
         }
       } catch (err: unknown) {
+        // AbortError 是用户主动取消，不需要报错
         if (err instanceof Error && err.name !== "AbortError") {
           onError(err.message);
         }

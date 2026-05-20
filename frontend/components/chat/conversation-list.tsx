@@ -1,5 +1,13 @@
 "use client";
 
+/**
+ * ConversationList — 会话列表组件
+ *
+ * 按创建日期分组显示（Today / Yesterday / Earlier），
+ * 支持新建、选择和删除会话。
+ * 使用 refreshKey 在会话创建/标题更新后触发刷新。
+ */
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MessageSquare, Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -27,11 +35,12 @@ export function ConversationList({ agentId, activeId, onSelect, onNew, refreshKe
   }, [agentId, refreshKey]);
 
   const handleDelete = useCallback(async (e: React.MouseEvent, id: string) => {
-    e.stopPropagation();
+    e.stopPropagation();  // 防止冒泡触发选中
     await api.deleteConversation(id);
     setConversations((prev) => prev.filter((c) => c.id !== id));
   }, []);
 
+  // 按日期分组：今天、昨天、更早
   const groups = useMemo(() => {
     const groups: Record<string, Conversation[]> = { Today: [], Yesterday: [], Earlier: [] };
     conversations.forEach((c) => {

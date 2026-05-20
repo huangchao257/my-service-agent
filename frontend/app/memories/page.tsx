@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * 记忆管理页面 — 查看和删除 Agent 提取的长期记忆
+ *
+ * 功能：
+ * - 按 Agent 和会话筛选记忆
+ * - 卡片列表显示记忆内容、来源 Agent、关联会话和时间戳
+ * - 单条删除（需确认）
+ * - 错误状态提示
+ */
+
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trash2, Brain, AlertCircle } from "lucide-react";
@@ -49,6 +59,7 @@ export default function MemoriesPage() {
   return (
     <div className="min-h-screen bg-background">
       <div className="max-w-4xl mx-auto p-6">
+        {/* 顶部导航 */}
         <div className="flex items-center gap-3 mb-6">
           <Link href="/chat">
             <Button variant="ghost" size="icon">
@@ -58,6 +69,7 @@ export default function MemoriesPage() {
           <h1 className="text-xl font-semibold">记忆管理</h1>
         </div>
 
+        {/* 筛选栏 */}
         <div className="flex gap-3 mb-6">
           <select
             className="flex-1 h-10 rounded-lg border bg-background px-3 text-sm"
@@ -81,6 +93,7 @@ export default function MemoriesPage() {
           </select>
         </div>
 
+        {/* 错误提示 */}
         {error && (
           <div className="mb-4 p-3 rounded-xl bg-destructive/10 border border-destructive/20 text-sm text-destructive flex items-center gap-2">
             <AlertCircle className="h-4 w-4 shrink-0" />
@@ -88,6 +101,7 @@ export default function MemoriesPage() {
           </div>
         )}
 
+        {/* 加载骨架屏 */}
         {loading ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (

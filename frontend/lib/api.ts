@@ -1,4 +1,13 @@
+/**
+ * API 客户端 — 封装所有后端接口调用
+ *
+ * 提供统一的 fetchJson 方法和按资源分组的 API 方法。
+ * 所有接口类型定义也集中在此文件中，方便前端各组件引用。
+ */
+
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+// ── 类型定义 ──
 
 export interface Agent {
   id: string;
@@ -34,7 +43,7 @@ export interface Provider {
   name: string;
   provider: string;
   api_base: string;
-  api_key: string;
+  api_key: string;        // 列表接口中已脱敏
   models: string[];
   is_active: boolean;
 }
@@ -42,7 +51,7 @@ export interface Provider {
 export interface MCPServer {
   id: string;
   name: string;
-  transport: string;
+  transport: string;       // "stdio" 或 "http"
   command: string | null;
   args_json: string;
   url: string | null;
@@ -54,14 +63,14 @@ export interface Skill {
   id: string;
   name: string;
   description: string;
-  prompt_template: string;
-  category: string;
+  prompt_template: string;  // 实际的 prompt 指令内容
+  category: string;          // 分类：general / coding / writing 等
   is_active: boolean;
 }
 
 export interface ModelOption {
-  value: string;
-  label: string;
+  value: string;           // "provider名称/model名称" 格式
+  label: string;           // 显示用标签
   provider_name: string;
   provider_id: string;
 }
@@ -69,8 +78,8 @@ export interface ModelOption {
 export interface Memory {
   id: string;
   agent_id: string;
-  conversation_id: string | null;
-  content: string;
+  conversation_id: string | null;  // 关联的会话 ID
+  content: string;                  // 记忆文本
   created_at: string;
 }
 
@@ -78,11 +87,11 @@ export interface LLMInteraction {
   id: string;
   agent_id: string;
   conversation_id: string | null;
-  model: string;
-  messages_json: string;
-  response_json: string | null;
-  token_usage_json: string | null;
-  duration_ms: number | null;
+  model: string;                   // 实际使用的模型名
+  messages_json: string;           // 发送给模型的完整消息 JSON
+  response_json: string | null;    // 模型响应 JSON
+  token_usage_json: string | null; // token 用量
+  duration_ms: number | null;      // 调用耗时（毫秒）
   created_at: string;
 }
 
@@ -90,6 +99,8 @@ export interface LLMInteractionList {
   items: LLMInteraction[];
   total: number;
 }
+
+// ── 通用请求方法 ──
 
 async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
   const res = await fetch(`${API_URL}${url}`, {
@@ -100,11 +111,14 @@ async function fetchJson<T>(url: string, options?: RequestInit): Promise<T> {
     const err = await res.text();
     throw new Error(err || `${res.status} ${res.statusText}`);
   }
-  if (res.status === 204) return undefined as T;
+  if (res.status === 204) return undefined as T;  // 204 No Content
   return res.json();
 }
 
+// ── API 方法（按资源分组） ──
+
 export const api = {
+  // Agent CRUD
   listAgents: () => fetchJson<Agent[]>("/api/agents"),
   createAgent: (data: Partial<Agent>) =>
     fetchJson<Agent>("/api/agents", { method: "POST", body: JSON.stringify(data) }),
@@ -113,6 +127,7 @@ export const api = {
   deleteAgent: (id: string) =>
     fetchJson<void>(`/api/agents/${id}`, { method: "DELETE" }),
 
+  // 会话管理
   listConversations: (agentId?: string) =>
     fetchJson<Conversation[]>(`/api/conversations${agentId ? `?agent_id=${agentId}` : ""}`),
   createConversation: (agentId: string, title?: string) =>
@@ -127,6 +142,7 @@ export const api = {
   getMessages: (conversationId: string) =>
     fetchJson<Message[]>(`/api/conversations/${conversationId}/messages`),
 
+  // LLM Provider 管理
   listProviders: () => fetchJson<Provider[]>("/api/providers"),
   createProvider: (data: Partial<Provider>) =>
     fetchJson<Provider>("/api/providers", { method: "POST", body: JSON.stringify(data) }),
@@ -136,6 +152,7 @@ export const api = {
     fetchJson<void>(`/api/providers/${id}`, { method: "DELETE" }),
   listModels: () => fetchJson<ModelOption[]>("/api/providers/models"),
 
+  // MCP Server 管理
   listMCPServers: () => fetchJson<MCPServer[]>("/api/mcp-servers"),
   createMCPServer: (data: Partial<MCPServer>) =>
     fetchJson<MCPServer>("/api/mcp-servers", { method: "POST", body: JSON.stringify(data) }),
@@ -144,6 +161,7 @@ export const api = {
   deleteMCPServer: (id: string) =>
     fetchJson<void>(`/api/mcp-servers/${id}`, { method: "DELETE" }),
 
+  // 技能管理
   listSkills: () => fetchJson<Skill[]>("/api/skills"),
   createSkill: (data: Partial<Skill>) =>
     fetchJson<Skill>("/api/skills", { method: "POST", body: JSON.stringify(data) }),
@@ -152,6 +170,7 @@ export const api = {
   deleteSkill: (id: string) =>
     fetchJson<void>(`/api/skills/${id}`, { method: "DELETE" }),
 
+  // 记忆管理
   listMemories: (params?: { agent_id?: string; conversation_id?: string }) => {
     const qs = new URLSearchParams();
     if (params?.agent_id) qs.set("agent_id", params.agent_id);
@@ -162,6 +181,7 @@ export const api = {
   deleteMemory: (id: string) =>
     fetchJson<void>(`/api/memories/${id}`, { method: "DELETE" }),
 
+  // LLM 交互记录
   listLLMInteractions: (params?: { agent_id?: string; conversation_id?: string; page?: number; page_size?: number }) => {
     const qs = new URLSearchParams();
     if (params?.agent_id) qs.set("agent_id", params.agent_id);

@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * Settings 页面 — 管理 LLM Provider、MCP Server、Skills
+ *
+ * 三个 Tab 切换：
+ * - LLM Providers：API 提供商配置
+ * - MCP Servers：模型上下文协议服务器
+ * - Skills：可复用的 prompt 模板
+ */
+
 import { useEffect, useState } from "react";
 import { ArrowLeft, Plus, Edit3, Trash2 } from "lucide-react";
 import Link from "next/link";
@@ -63,6 +72,7 @@ export default function SettingsPage() {
           <h1 className="text-2xl font-bold flex-1">Settings</h1>
         </div>
 
+        {/* Tab 切换栏 */}
         <div className="flex gap-1 mb-6 border-b">
           {tabs.map((t) => (
             <button key={t.key} onClick={() => setTab(t.key)}
@@ -72,6 +82,7 @@ export default function SettingsPage() {
           ))}
         </div>
 
+        {/* LLM Providers Tab */}
         {tab === "providers" && (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -85,6 +96,7 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {/* MCP Servers Tab */}
         {tab === "mcp" && (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -115,6 +127,7 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {/* Skills Tab */}
         {tab === "skills" && (
           <div>
             <div className="flex items-center justify-between mb-4">
@@ -146,6 +159,7 @@ export default function SettingsPage() {
           </div>
         )}
 
+        {/* 弹窗表单 */}
         <ProviderForm open={providerFormOpen} onClose={() => { setProviderFormOpen(false); setEditingProvider(null); }} onSave={handleSaveProvider} provider={editingProvider} />
         <MCPForm open={mcpFormOpen} onClose={() => { setMcpFormOpen(false); setEditingMcp(null); }} onSave={handleSaveMcp} server={editingMcp} />
         <SkillForm open={skillFormOpen} onClose={() => { setSkillFormOpen(false); setEditingSkill(null); }} onSave={handleSaveSkill} skill={editingSkill} />

@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * LLM 交互记录页面 — 查看每次 LLM 调用的完整上下文
+ *
+ * 功能：
+ * - 按 Agent 和会话筛选
+ * - 分页列表（每页 20 条），显示模型名、消息数、耗时、时间戳
+ * - 点击展开完整上下文：Messages（按 role 着色）+ 模型响应
+ * - 请求详情和错误状态提示
+ */
+
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, ChevronDown, ChevronUp, Clock, MessageSquare, Cpu, AlertCircle } from "lucide-react";
@@ -7,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Agent, Conversation, LLMInteraction, api } from "@/lib/api";
 
+// 消息角色颜色映射 — 展开时用不同背景色区分 system/user/assistant/tool
 const ROLE_COLORS: Record<string, string> = {
   system: "bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-600",
   user: "bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-700",
@@ -51,8 +62,10 @@ export default function LLMInteractionsPage() {
     loadInteractions();
   }, [loadInteractions]);
 
+  // 筛选条件变化时重置到第一页
   useEffect(() => { setPage(1); }, [selectedAgentId, selectedConvId]);
 
+  // 展开/收起：展开时调用详情接口获取完整数据
   const handleExpand = async (id: string) => {
     if (expandedId === id) { setExpandedId(null); setExpandedData(null); return; }
     setExpandedId(id);
@@ -64,6 +77,7 @@ export default function LLMInteractionsPage() {
   const getAgentName = (agentId: string) => agents.find((a) => a.id === agentId)?.name || agentId;
   const getConvTitle = (convId: string) => conversations.find((c) => c.id === convId)?.title || convId;
 
+  // 渲染消息列表，按 role 着色
   const renderMessages = (messagesJson: string) => {
     let messages: { role: string; content: string | null }[];
     try { messages = JSON.parse(messagesJson); } catch { return <p className="text-sm text-red-500">无法解析消息</p>; }
@@ -91,6 +105,7 @@ export default function LLMInteractionsPage() {
           <h1 className="text-xl font-semibold">LLM 交互记录</h1>
         </div>
 
+        {/* 筛选栏 */}
         <div className="flex gap-3 mb-6">
           <select
             className="flex-1 h-10 rounded-lg border bg-background px-3 text-sm"
@@ -154,8 +169,9 @@ export default function LLMInteractionsPage() {
                       {expandedId === item.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </div>
                   </div>
+                  {/* 展开的详情区域 */}
                   {expandedId === item.id && expandedData && (
-                    <div className="mt-4 pt-4 border-t" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-4 pt-4 border-t" onClick={(e) => e.stopPropagation()}>  {/* stopPropagation 防止点击详情区时收起 */}
                       <h4 className="text-sm font-semibold mb-2">完整上下文 (Messages)</h4>
                       {renderMessages(expandedData.messages_json)}
                       {expandedData.response_json && (
@@ -174,6 +190,7 @@ export default function LLMInteractionsPage() {
           </div>
         )}
 
+        {/* 分页控件 */}
         {totalPages > 1 && (
           <div className="flex items-center justify-center gap-3 mt-6">
             <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => setPage((p) => p - 1)}>上一页</Button>

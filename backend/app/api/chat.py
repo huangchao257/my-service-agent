@@ -1,3 +1,10 @@
+"""
+聊天 API — SSE 流式对话接口
+
+POST /api/chat/{conversation_id} 发起一轮对话。
+后端通过 SSE 实时推送：delta（文本增量）→ tool_call → tool_result → done。
+"""
+
 from uuid import UUID
 import json
 from fastapi import APIRouter, Depends, HTTPException
@@ -15,6 +22,17 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 @router.post("/{conversation_id}")
 async def chat(conversation_id: UUID, data: ChatRequest, db: AsyncSession = Depends(get_db)):
+    """SSE 流式对话端点。
+
+    事件类型：
+    - delta: LLM 文本增量输出
+    - tool_call: Agent 调用工具
+    - tool_result: 工具执行结果
+    - delta: 工具结果注入后 LLM 继续输出（可多轮）
+    - title_updated: 首次对话完成后自动生成标题
+    - done: 对话完成
+    - error: 异常信息
+    """
     result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
     conv = result.scalar_one_or_none()
     if not conv:

@@ -1,3 +1,8 @@
+"""对话会话模型。
+
+标题初始为 "New Chat"，首次消息交换后由 LLM 自动生成。
+级联删除：删除 Agent 时同时删除其所有会话。"""
+
 import uuid
 from datetime import datetime
 from sqlalchemy import String, DateTime, ForeignKey, func

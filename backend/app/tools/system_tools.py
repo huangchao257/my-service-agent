@@ -1,3 +1,5 @@
+"""系统工具 — 时间查询和数学计算"""
+
 from datetime import datetime
 from app.tools.base import tool_registry
 
@@ -9,6 +11,7 @@ from app.tools.base import tool_registry
     risk="low",
 )
 async def get_current_time(timezone: str = "UTC") -> str:
+    """获取当前 UTC 时间"""
     return f"Current time: {datetime.utcnow().isoformat()} UTC"
 
 
@@ -19,6 +22,8 @@ async def get_current_time(timezone: str = "UTC") -> str:
     risk="low",
 )
 async def calculator(expression: str) -> str:
+    """安全地计算数学表达式。
+    仅允许数字和基本运算符，使用受限的 eval（禁用内置函数）防止代码注入。"""
     allowed = set("0123456789+-*/.() ")
     if not all(c in allowed for c in expression):
         return "Error: expression contains disallowed characters"

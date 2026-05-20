@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * AgentSelector — Agent 下拉选择器
+ *
+ * 使用 shadcn/ui 的 Command + Popover 组件实现的搜索型下拉框。
+ * 支持输入关键词搜索 Agent。
+ */
+
 import { useEffect, useState } from "react";
 import { Check, ChevronsUpDown, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";

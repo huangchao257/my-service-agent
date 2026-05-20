@@ -1,17 +1,27 @@
 "use client";
 
+/**
+ * ToolCallCard — 工具调用卡片组件
+ *
+ * 显示 Agent 调用工具的过程：
+ * - 执行中：旋转加载图标 + "Calling {name}..."
+ * - 执行完成：扳手图标 + 可展开的参数和结果
+ *
+ * 使用 memo 优化渲染性能。
+ */
+
 import { memo, useState } from "react";
 import { Wrench, ChevronDown, Loader2 } from "lucide-react";
 
 interface ToolCallCardProps {
-  name: string;
-  args: string;
-  output?: string;
-  isExecuting?: boolean;
+  name: string;       // 工具名称
+  args: string;       // 调用参数（JSON 字符串）
+  output?: string;    // 工具返回结果
+  isExecuting?: boolean;  // 是否正在执行中
 }
 
 export const ToolCallCard = memo(function ToolCallCard({ name, args, output, isExecuting }: ToolCallCardProps) {
-  const [expanded, setExpanded] = useState(isExecuting || false);
+  const [expanded, setExpanded] = useState(isExecuting || false);  // 执行时自动展开
 
   return (
     <div className="flex justify-start py-1.5 animate-fade-in">
@@ -28,6 +38,7 @@ export const ToolCallCard = memo(function ToolCallCard({ name, args, output, isE
           <span>{isExecuting ? `Calling ${name}...` : `Called ${name}`}</span>
           <ChevronDown className={`h-4 w-4 ml-auto transition-transform ${expanded ? "rotate-180" : ""}`} />
         </button>
+        {/* 展开区域：参数和结果 */}
         {expanded && (
           <div className="mt-2 text-xs space-y-1.5 animate-fade-in">
             {args && (

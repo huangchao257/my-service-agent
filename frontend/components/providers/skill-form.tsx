@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * SkillForm — 技能模板创建/编辑弹窗
+ *
+ * 技能是可复用的 prompt 模板，按 category 分类。
+ * 分配给 Agent 后注入到 system message 中。
+ */
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -51,6 +58,7 @@ export function SkillForm({ open, onClose, onSave, skill }: SkillFormProps) {
               {CATEGORIES.map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
+          {/* Prompt 模板：核心字段 */}
           <div><label className="text-sm font-medium">Prompt Template</label><Textarea value={promptTemplate} onChange={(e) => setPromptTemplate(e.target.value)} placeholder="You are an expert code reviewer..." rows={6} /></div>
           <label className="flex items-center gap-2 text-sm">
             <input type="checkbox" checked={isActive} onChange={(e) => setIsActive(e.target.checked)} />Active

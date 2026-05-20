@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * Agents 管理页面 — Agent 的列表、创建和编辑
+ *
+ * 网格布局展示所有 Agent 卡片，支持创建新 Agent 和编辑现有 Agent。
+ * 通过 AgentForm 弹窗进行创建/编辑操作。
+ */
+
 import { useEffect, useState, useCallback } from "react";
 import { ArrowLeft, Plus, Bot } from "lucide-react";
 import Link from "next/link";
@@ -35,6 +42,7 @@ export default function AgentsPage() {
           <Button onClick={() => { setEditingAgent(null); setFormOpen(true); }} className="rounded-xl"><Plus className="mr-2 h-4 w-4" />Create Agent</Button>
         </div>
 
+        {/* 加载骨架屏 */}
         {loading ? (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {[1, 2].map((i) => (

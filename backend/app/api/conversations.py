@@ -1,3 +1,10 @@
+"""
+会话 API — 会话 CRUD + 消息查询
+
+会话是对话的容器，绑定到某个 Agent。
+支持按 agent_id 筛选会话列表。
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -13,6 +20,7 @@ router = APIRouter(prefix="/api/conversations", tags=["conversations"])
 
 @router.get("", response_model=list[ConversationResponse])
 async def list_conversations(agent_id: UUID | None = None, db: AsyncSession = Depends(get_db)):
+    """获取会话列表，可按 Agent 筛选，按更新时间倒序"""
     query = select(Conversation).order_by(Conversation.updated_at.desc())
     if agent_id:
         query = query.where(Conversation.agent_id == agent_id)
@@ -22,6 +30,7 @@ async def list_conversations(agent_id: UUID | None = None, db: AsyncSession = De
 
 @router.post("", response_model=ConversationResponse, status_code=201)
 async def create_conversation(data: ConversationCreate, db: AsyncSession = Depends(get_db)):
+    """创建新会话"""
     conv = Conversation(**data.model_dump())
     db.add(conv)
     await db.commit()
@@ -31,6 +40,7 @@ async def create_conversation(data: ConversationCreate, db: AsyncSession = Depen
 
 @router.delete("/{conversation_id}", status_code=204)
 async def delete_conversation(conversation_id: UUID, db: AsyncSession = Depends(get_db)):
+    """删除指定会话及其所有消息"""
     result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
     conv = result.scalar_one_or_none()
     if not conv:
@@ -41,6 +51,7 @@ async def delete_conversation(conversation_id: UUID, db: AsyncSession = Depends(
 
 @router.get("/{conversation_id}/messages", response_model=list[MessageResponse])
 async def get_messages(conversation_id: UUID, db: AsyncSession = Depends(get_db)):
+    """获取指定会话的全部消息，按创建时间正序"""
     result = await db.execute(
         select(Message).where(Message.conversation_id == conversation_id).order_by(Message.created_at.asc())
     )
@@ -49,6 +60,7 @@ async def get_messages(conversation_id: UUID, db: AsyncSession = Depends(get_db)
 
 @router.get("/{conversation_id}", response_model=ConversationResponse)
 async def get_conversation(conversation_id: UUID, db: AsyncSession = Depends(get_db)):
+    """获取单个会话详情（用于 URL 直接跳转）"""
     result = await db.execute(select(Conversation).where(Conversation.id == conversation_id))
     conv = result.scalar_one_or_none()
     if not conv:

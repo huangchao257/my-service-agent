@@ -1,5 +1,15 @@
 "use client";
 
+/**
+ * MessageInput — 消息输入框组件
+ *
+ * 支持：
+ * - Enter 发送，Shift+Enter 换行
+ * - 流式输出时显示停止按钮（红色方块）
+ * - 自动聚焦
+ * - 自动调整高度（最多 200px）
+ */
+
 import { useState, useRef, KeyboardEvent, useCallback } from "react";
 import { Send, Loader2, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 interface MessageInputProps {
   onSend: (message: string) => void;
   isStreaming: boolean;
-  onStop?: () => void;
+  onStop?: () => void;  // 停止当前 SSE 流
 }
 
 export function MessageInput({ onSend, isStreaming, onStop }: MessageInputProps) {
@@ -41,6 +51,7 @@ export function MessageInput({ onSend, isStreaming, onStop }: MessageInputProps)
           disabled={isStreaming}
           autoFocus
         />
+        {/* 流式输出时显示停止按钮 */}
         {isStreaming ? (
           <Button onClick={onStop} size="icon" className="h-11 w-11 shrink-0 rounded-xl" variant="destructive">
             <Square className="h-4 w-4" />

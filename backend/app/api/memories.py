@@ -1,3 +1,10 @@
+"""
+记忆 API — 记忆查询与删除
+
+记忆是 agent_runtime 在每个对话轮次后自动提取的关键信息片段。
+支持按 agent_id 和 conversation_id 筛选。
+"""
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
@@ -16,6 +23,7 @@ async def list_memories(
     conversation_id: UUID | None = Query(None),
     db: AsyncSession = Depends(get_db),
 ):
+    """获取记忆列表，可按 Agent 和会话筛选，按创建时间倒序"""
     stmt = select(Memory).order_by(Memory.created_at.desc())
     if agent_id:
         stmt = stmt.where(Memory.agent_id == agent_id)
@@ -27,6 +35,7 @@ async def list_memories(
 
 @router.delete("/{memory_id}", status_code=204)
 async def delete_memory(memory_id: UUID, db: AsyncSession = Depends(get_db)):
+    """删除单条记忆"""
     result = await db.execute(select(Memory).where(Memory.id == memory_id))
     memory = result.scalar_one_or_none()
     if not memory:

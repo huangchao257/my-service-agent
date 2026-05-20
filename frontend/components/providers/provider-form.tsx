@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * ProviderForm — LLM Provider 创建/编辑弹窗
+ *
+ * API Key 字段在编辑时不回填（留空表示保持不变），新建时必填。
+ * Models 以逗号分隔输入。
+ */
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,7 +20,7 @@ interface ProviderFormProps {
 export function ProviderForm({ open, onClose, onSave, provider }: ProviderFormProps) {
   const [name, setName] = useState(provider?.name || "");
   const [apiBase, setApiBase] = useState(provider?.api_base || "");
-  const [apiKey, setApiKey] = useState("");
+  const [apiKey, setApiKey] = useState("");  // 编辑时留空，只有输入了才更新
   const [models, setModels] = useState(provider?.models.join(", ") || "");
 
   useEffect(() => {
@@ -23,7 +30,7 @@ export function ProviderForm({ open, onClose, onSave, provider }: ProviderFormPr
   const handleSave = async () => {
     const modelList = models.split(",").map((m) => m.trim()).filter(Boolean);
     const data: Partial<Provider> = { name, api_base: apiBase, models: modelList };
-    if (apiKey) data.api_key = apiKey;
+    if (apiKey) data.api_key = apiKey;  // 仅在有新输入时才包含 key
     await onSave(data);
     onClose();
   };

@@ -1,5 +1,16 @@
 "use client";
 
+/**
+ * Sidebar — 左侧导航栏
+ *
+ * 布局（从上到下）：
+ * - Agent 选择器（下拉搜索）
+ * - 会话列表（可滚动，按日期分组）
+ * - 固定导航链接（Manage Agents / Settings / LLM 交互 / 记忆管理）
+ *
+ * 使用 shrink-0 确保导航区不随会话列表滚动。
+ */
+
 import { Bot, Settings, PanelLeft, Brain, Cpu } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -22,10 +33,12 @@ export function Sidebar({
 }: SidebarProps) {
   return (
     <div className="flex flex-col h-full w-[280px] border-r bg-sidebar">
+      {/* Agent 选择器 */}
       <div className="p-3">
         <AgentSelector selectedId={selectedAgent?.id ?? null} onSelect={onSelectAgent} />
       </div>
       <Separator />
+      {/* 会话列表 — flex-1 + overflow-hidden + min-h-0 确保可滚动 */}
       <div className="flex-1 overflow-hidden min-h-0">
         <ConversationList
           agentId={selectedAgent?.id ?? null}
@@ -35,6 +48,7 @@ export function Sidebar({
         />
       </div>
       <Separator />
+      {/* 固定导航链接 — shrink-0 防止被压缩 */}
       <div className="p-3 flex flex-col gap-1 shrink-0">
         <Link href="/agents">
           <Button variant="ghost" className="w-full justify-start text-sm text-muted-foreground hover:text-foreground">

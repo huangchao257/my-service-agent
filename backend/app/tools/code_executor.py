@@ -1,3 +1,12 @@
+"""代码执行工具 — 在子进程中运行 Python 代码
+
+风险等级：high（需要用户确认）。
+限制：
+- 超时 30 秒
+- 输出截断到 4096 字符
+- 临时文件用完即删
+"""
+
 import subprocess
 import tempfile
 import os
@@ -11,8 +20,10 @@ from app.tools.base import tool_registry
     risk="high",
 )
 async def execute_code(code: str, language: str = "python") -> str:
+    """在隔离的子进程中执行 Python 代码。仅支持 Python，超时 30 秒。"""
     if language != "python":
         return f"Error: language '{language}' is not supported"
+    # 写入临时文件后执行，避免 shell 注入
     with tempfile.NamedTemporaryFile(mode="w", suffix=".py", delete=False) as f:
         f.write(code)
         tmp_path = f.name

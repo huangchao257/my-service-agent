@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * AgentForm — Agent 创建/编辑弹窗表单
+ *
+ * 包含：头像、名称、Provider/Model 选择、System Prompt、
+ * Temperature 滑块、内置工具多选、MCP Server 多选、Skills 多选。
+ *
+ * Provider 和 Model 是级联选择：先选 Provider，再选该 Provider 下的模型。
+ */
+
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,6 +23,7 @@ interface AgentFormProps {
   agent?: Agent | null;
 }
 
+// 内置工具列表
 const BUILTIN_TOOLS = ["calculator", "get_current_time", "web_search", "read_file", "write_file", "execute_code"];
 
 export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
@@ -37,6 +47,7 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
     api.listSkills().then(setAllSkills).catch(console.error);
   }, [open]);
 
+  // 编辑时回填表单
   useEffect(() => {
     if (agent) {
       setName(agent.name); setAvatar(agent.avatar); setSystemPrompt(agent.system_prompt);
@@ -53,6 +64,7 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
     onClose();
   };
 
+  // Provider/Model 级联选择逻辑
   const providers = [...new Set(models.map((m) => m.provider_name))];
   const selectedProvider = model.split("/")[0] || "";
   const filteredModels = models.filter((m) => m.provider_name === selectedProvider);
@@ -62,11 +74,13 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader><DialogTitle>{agent ? "Edit Agent" : "Create Agent"}</DialogTitle></DialogHeader>
         <div className="space-y-4">
+          {/* 头像 + 名称 */}
           <div className="flex gap-3">
             <div className="w-16"><label className="text-sm font-medium">Avatar</label><Input value={avatar} onChange={(e) => setAvatar(e.target.value)} className="text-center text-xl" maxLength={2} /></div>
             <div className="flex-1"><label className="text-sm font-medium">Name</label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Agent name" /></div>
           </div>
 
+          {/* Provider 选择 */}
           <div>
             <label className="text-sm font-medium">Provider</label>
             <select className="w-full mt-1 rounded-md border px-3 py-2 text-sm" value={selectedProvider}
@@ -76,6 +90,7 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
             </select>
           </div>
 
+          {/* Model 选择（级联） */}
           <div>
             <label className="text-sm font-medium">Model</label>
             <select className="w-full mt-1 rounded-md border px-3 py-2 text-sm" value={model}
@@ -87,8 +102,10 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
 
           <div><label className="text-sm font-medium">System Prompt</label><Textarea value={systemPrompt} onChange={(e) => setSystemPrompt(e.target.value)} placeholder="You are a helpful assistant..." rows={4} /></div>
 
+          {/* Temperature 滑块 */}
           <div><label className="text-sm font-medium">Temperature: {temperature}</label><input type="range" min="0" max="2" step="0.1" value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} className="w-full" /></div>
 
+          {/* 内置工具多选 */}
           <div>
             <label className="text-sm font-medium">Tools</label>
             <div className="flex flex-wrap gap-2 mt-1">
@@ -101,6 +118,7 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
             </div>
           </div>
 
+          {/* MCP Server 多选 */}
           {allMcpServers.length > 0 && (
             <div>
               <label className="text-sm font-medium">MCP Servers</label>
@@ -115,6 +133,7 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
             </div>
           )}
 
+          {/* Skills 多选 */}
           {allSkills.length > 0 && (
             <div>
               <label className="text-sm font-medium">Skills</label>

@@ -1,3 +1,9 @@
+"""网络搜索工具 — 通过 DuckDuckGo 进行实时网页搜索
+
+返回前 5 条结果的标题、摘要和链接。
+依赖 ddgs 库（DuckDuckGo Search）。
+"""
+
 from app.tools.base import tool_registry
 
 
@@ -8,6 +14,7 @@ from app.tools.base import tool_registry
     risk="low",
 )
 async def web_search(query: str) -> str:
+    """使用 DuckDuckGo 搜索网页，返回前 5 条结果"""
     try:
         from ddgs import DDGS
         results = list(DDGS().text(query, max_results=5))
@@ -16,7 +23,7 @@ async def web_search(query: str) -> str:
         lines = []
         for i, r in enumerate(results, 1):
             title = r.get("title", "No title")
-            body = r.get("body", "")[:300]
+            body = r.get("body", "")[:300]    # 截断摘要到 300 字符
             href = r.get("href", "")
             lines.append(f"{i}. {title}\n   {body}\n   {href}")
         return "\n\n".join(lines)

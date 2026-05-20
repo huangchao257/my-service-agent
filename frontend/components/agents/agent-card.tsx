@@ -1,5 +1,12 @@
 "use client";
 
+/**
+ * AgentCard — Agent 卡片组件
+ *
+ * 显示 Agent 的头像、名称、模型、system prompt 摘要和已启用的工具标签。
+ * 提供编辑和删除操作按钮。
+ */
+
 import { Pencil, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -24,7 +31,9 @@ export function AgentCard({ agent, onEdit, onDelete }: AgentCardProps) {
             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onDelete(agent.id)}><Trash2 className="h-4 w-4 text-destructive" /></Button>
           </div>
         </div>
+        {/* System prompt 摘要，最多两行 */}
         <p className="text-sm text-muted-foreground line-clamp-2 mt-2">{agent.system_prompt}</p>
+        {/* 已启用的工具标签 */}
         {agent.tools.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-3">
             {agent.tools.map((t) => (

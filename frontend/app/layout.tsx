@@ -1,3 +1,8 @@
+/**
+ * 根级布局 — 设置 HTML 字体和 body 基础样式
+ *
+ * 使用 next/font 加载 Geist Sans 和 Geist Mono 字体变量。
+ */
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
