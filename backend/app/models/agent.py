@@ -30,5 +30,9 @@ class Agent(Base):
     high_risk_tools_enabled: Mapped[list] = mapped_column(JSON, default=list)
     temperature: Mapped[float] = mapped_column(Float, default=0.7)
     max_tokens: Mapped[int] = mapped_column(Integer, default=4096)
+    # 每轮注入 LLM 的历史消息条数上限（避免上下文膨胀）
+    history_limit: Mapped[int] = mapped_column(Integer, default=20)
+    # 检索长期记忆时返回的条数；None 表示用全局 settings.memory_top_k
+    memory_top_k: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

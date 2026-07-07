@@ -12,8 +12,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, Brain, AlertCircle } from "lucide-react";
+import { ArrowLeft, Trash2, Brain, AlertCircle, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { Agent, Conversation, Memory, api } from "@/lib/api";
 
@@ -23,6 +24,7 @@ export default function MemoriesPage() {
   const [memories, setMemories] = useState<Memory[]>([]);
   const [selectedAgentId, setSelectedAgentId] = useState("");
   const [selectedConvId, setSelectedConvId] = useState("");
+  const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
@@ -37,11 +39,12 @@ export default function MemoriesPage() {
     api.listMemories({
       agent_id: selectedAgentId || undefined,
       conversation_id: selectedConvId || undefined,
+      search: search || undefined,
     })
       .then(setMemories)
       .catch((err) => { console.error(err); setError(err.message || "加载失败"); })
       .finally(() => setLoading(false));
-  }, [selectedAgentId, selectedConvId]);
+  }, [selectedAgentId, selectedConvId, search]);
 
   useEffect(() => {
     loadMemories();
@@ -70,7 +73,7 @@ export default function MemoriesPage() {
         </div>
 
         {/* 筛选栏 */}
-        <div className="flex gap-3 mb-6">
+        <div className="flex gap-3 mb-3">
           <select
             className="flex-1 h-10 rounded-lg border bg-background px-3 text-sm"
             value={selectedAgentId}
@@ -91,6 +94,15 @@ export default function MemoriesPage() {
               <option key={c.id} value={c.id}>{c.title}</option>
             ))}
           </select>
+        </div>
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="搜索记忆内容..."
+            className="pl-9"
+          />
         </div>
 
         {/* 错误提示 */}

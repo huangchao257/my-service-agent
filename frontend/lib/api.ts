@@ -18,8 +18,11 @@ export interface Agent {
   tools: string[];
   mcp_servers: string[];
   skills: string[];
+  high_risk_tools_enabled: string[];
   temperature: number;
   max_tokens: number;
+  history_limit: number;
+  memory_top_k: number | null;
 }
 
 export interface Conversation {
@@ -126,10 +129,17 @@ export const api = {
     fetchJson<Agent>(`/api/agents/${id}`, { method: "PUT", body: JSON.stringify(data) }),
   deleteAgent: (id: string) =>
     fetchJson<void>(`/api/agents/${id}`, { method: "DELETE" }),
+  duplicateAgent: (id: string) =>
+    fetchJson<Agent>(`/api/agents/${id}/duplicate`, { method: "POST" }),
 
   // 会话管理
-  listConversations: (agentId?: string) =>
-    fetchJson<Conversation[]>(`/api/conversations${agentId ? `?agent_id=${agentId}` : ""}`),
+  listConversations: (agentId?: string, search?: string) => {
+    const qs = new URLSearchParams();
+    if (agentId) qs.set("agent_id", agentId);
+    if (search) qs.set("search", search);
+    const q = qs.toString();
+    return fetchJson<Conversation[]>(`/api/conversations${q ? `?${q}` : ""}`);
+  },
   createConversation: (agentId: string, title?: string) =>
     fetchJson<Conversation>("/api/conversations", {
       method: "POST",
@@ -141,6 +151,12 @@ export const api = {
     fetchJson<void>(`/api/conversations/${id}`, { method: "DELETE" }),
   getMessages: (conversationId: string) =>
     fetchJson<Message[]>(`/api/conversations/${conversationId}/messages`),
+  exportConversation: (id: string, format: "markdown" | "json") =>
+    fetch(`${API_URL}/api/conversations/${id}/export?format=${format}`).then((r) => r.blob()),
+
+  // 聊天（SSE 流式端点直接由 use-sse.ts 调用，这里只放重生 URL 构造）
+  regenerateUrl: (conversationId: string) =>
+    `${API_URL}/api/chat/${conversationId}/regenerate`,
 
   // LLM Provider 管理
   listProviders: () => fetchJson<Provider[]>("/api/providers"),
@@ -151,6 +167,10 @@ export const api = {
   deleteProvider: (id: string) =>
     fetchJson<void>(`/api/providers/${id}`, { method: "DELETE" }),
   listModels: () => fetchJson<ModelOption[]>("/api/providers/models"),
+  testProvider: (id: string) =>
+    fetchJson<{ ok: boolean; detail: string }>(`/api/providers/${id}/test`, { method: "POST" }),
+  refreshProviderModels: (id: string) =>
+    fetchJson<Provider>(`/api/providers/${id}/refresh-models`, { method: "POST" }),
 
   // MCP Server 管理
   listMCPServers: () => fetchJson<MCPServer[]>("/api/mcp-servers"),
@@ -171,10 +191,11 @@ export const api = {
     fetchJson<void>(`/api/skills/${id}`, { method: "DELETE" }),
 
   // 记忆管理
-  listMemories: (params?: { agent_id?: string; conversation_id?: string }) => {
+  listMemories: (params?: { agent_id?: string; conversation_id?: string; search?: string }) => {
     const qs = new URLSearchParams();
     if (params?.agent_id) qs.set("agent_id", params.agent_id);
     if (params?.conversation_id) qs.set("conversation_id", params.conversation_id);
+    if (params?.search) qs.set("search", params.search);
     const q = qs.toString();
     return fetchJson<Memory[]>(`/api/memories${q ? `?${q}` : ""}`);
   },

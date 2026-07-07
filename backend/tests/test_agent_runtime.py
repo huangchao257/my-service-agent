@@ -14,6 +14,46 @@ from app.models.conversation import Conversation
 from app.tools.base import tool_registry, ToolDefinition
 
 
+def test_build_messages_assembles_system_skills_tools_memory_history():
+    """_build_messages 按顺序拼装：system(含技能) → 工具说明 → 记忆 → 历史 → 用户。"""
+    agent = Agent(
+        name="A", model="m", system_prompt="You are X.",
+        tools=["calculator"], skills=[], high_risk_tools_enabled=[],
+    )
+    skill = Skill(name="coder", prompt_template="Be concise.")
+    # 用 SimpleNamespace 模拟 history 消息
+    class M: pass
+    h1 = M(); h1.role = "user"; h1.content = "old q"
+    h2 = M(); h2.role = "assistant"; h2.content = "old a"
+
+    msgs = AgentRuntime._build_messages(
+        agent, skills=[skill], memories=["likes python"], history=[h1, h2], user_message="new q"
+    )
+
+    assert msgs[0]["role"] == "system"
+    assert "You are X." in msgs[0]["content"]
+    assert "# Skill: coder" in msgs[0]["content"]  # 技能注入
+    assert "Be concise." in msgs[0]["content"]
+    # 第二条 system 是工具说明
+    assert msgs[1]["role"] == "system"
+    assert "calculator" in msgs[1]["content"]
+    # 第三条 system 是记忆
+    assert msgs[2]["role"] == "system"
+    assert "likes python" in msgs[2]["content"]
+    # 历史 + 用户
+    assert msgs[-1] == {"role": "user", "content": "new q"}
+    assert msgs[-2] == {"role": "assistant", "content": "old a"}
+
+
+def test_build_messages_minimal():
+    """无技能/记忆/历史/工具时只产出 system + user 两条。"""
+    agent = Agent(name="A", model="m", system_prompt="hi", tools=[])
+    msgs = AgentRuntime._build_messages(agent, [], [], [], "hello")
+    assert len(msgs) == 2
+    assert msgs[0]["role"] == "system"
+    assert msgs[1] == {"role": "user", "content": "hello"}
+
+
 @pytest.mark.asyncio
 async def test_load_skills_resolves_by_name(db_session):
     """_load_skills 按 Agent.skills 中的名称解析，保持声明顺序，忽略未知名称。"""

@@ -15,6 +15,7 @@ from app.database import get_db
 from app.models.provider import LLMProvider
 from app.schemas.provider import ProviderCreate, ProviderUpdate, ProviderResponse
 from app.core.cache import cache
+from app.core.crypto import encrypt, decrypt
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 
@@ -82,28 +83,32 @@ async def get_provider(provider_id: UUID, db: AsyncSession = Depends(get_db)):
 
 @router.post("", response_model=ProviderResponse, status_code=201)
 async def create_provider(data: ProviderCreate, db: AsyncSession = Depends(get_db)):
-    """创建新的 LLM Provider 配置"""
-    provider = LLMProvider(**data.model_dump())
+    """创建新的 LLM Provider 配置。api_key 落库前做静态加密（若启用）。"""
+    payload = data.model_dump()
+    payload["api_key"] = encrypt(payload["api_key"])
+    provider = LLMProvider(**payload)
     db.add(provider)
     await db.commit()
     await db.refresh(provider)
     await cache.delete(_MODELS_CACHE_KEY)
-    return provider
+    return ProviderResponse.masked(provider)
 
 
 @router.put("/{provider_id}", response_model=ProviderResponse)
 async def update_provider(provider_id: UUID, data: ProviderUpdate, db: AsyncSession = Depends(get_db)):
-    """更新 Provider 配置，仅更新传入的字段"""
+    """更新 Provider 配置，仅更新传入的字段。api_key 若更新则加密后落库。"""
     result = await db.execute(select(LLMProvider).where(LLMProvider.id == provider_id))
     provider = result.scalar_one_or_none()
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
     for key, value in data.model_dump(exclude_unset=True).items():
+        if key == "api_key" and value:
+            value = encrypt(value)
         setattr(provider, key, value)
     await db.commit()
     await db.refresh(provider)
     await cache.delete(_MODELS_CACHE_KEY)
-    return provider
+    return ProviderResponse.masked(provider)
 
 
 @router.delete("/{provider_id}", status_code=204)
@@ -141,7 +146,7 @@ async def test_provider_connection(provider_id: UUID, db: AsyncSession = Depends
             messages=[{"role": "user", "content": "ping"}],
             max_tokens=1,
             api_base=api_base,
-            api_key=provider.api_key,
+            api_key=decrypt(provider.api_key),
             timeout=15,
         )
         return {"ok": True, "detail": "connection successful"}
@@ -169,7 +174,7 @@ async def refresh_provider_models(provider_id: UUID, db: AsyncSession = Depends(
     models_url = api_base.rstrip("/") + "/models"
     try:
         async with httpx.AsyncClient(timeout=15) as http:
-            resp = await http.get(models_url, headers={"Authorization": f"Bearer {provider.api_key}"})
+            resp = await http.get(models_url, headers={"Authorization": f"Bearer {decrypt(provider.api_key)}"})
         if resp.status_code == 200:
             data = resp.json().get("data") or []
             ids = [m.get("id") for m in data if m.get("id")]

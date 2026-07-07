@@ -32,6 +32,7 @@ from app.models.skill import Skill
 from app.core.llm_gateway import llm_gateway
 from app.core.memory_manager import memory_manager
 from app.core.mcp_manager import mcp_manager
+from app.core.crypto import decrypt
 from app.tools import tool_registry
 
 logger = get_logger(__name__)
@@ -62,6 +63,67 @@ class AgentRuntime:
         by_name = {s.name: s for s in result.scalars().all()}
         return [by_name[n] for n in names if n in by_name]
 
+    @staticmethod
+    def _build_messages(agent, skills, memories, history, user_message: str) -> list[dict]:
+        """构建发送给 LLM 的完整消息列表。
+
+        顺序：system(含技能模板) → 工具说明 system → 记忆 system → 历史消息 → 用户消息。
+        提取为独立方法便于单测消息拼装逻辑，不依赖 DB / LLM。"""
+        system_content = agent.system_prompt
+        if skills:
+            skill_block = "\n\n".join(f"# Skill: {s.name}\n{s.prompt_template}" for s in skills)
+            system_content = f"{system_content}\n\n{skill_block}"
+        messages: list[dict] = [{"role": "system", "content": system_content}]
+        if agent.tools:
+            tool_names = ", ".join(agent.tools)
+            messages.append({
+                "role": "system",
+                "content": f"Available tools: {tool_names}. To use a tool, call the function with the required parameters. For web_search, always provide a 'query' parameter with your search query. IMPORTANT: After receiving tool results, ALWAYS provide a text response to the user summarizing what you found. Do not call the same tool with the same parameters repeatedly.",
+            })
+        if memories:
+            memory_text = "Relevant context about the user:\n" + "\n".join(f"- {m}" for m in memories)
+            messages.append({"role": "system", "content": memory_text})
+        for msg in history:
+            messages.append({"role": msg.role, "content": msg.content})
+        messages.append({"role": "user", "content": user_message})
+        return messages
+
+    async def _execute_tool_call(self, agent, tc: dict, user_message: str) -> tuple[str, dict | None]:
+        """执行单次工具调用，返回 (tool_result, optional_extra_event)。
+
+        内置工具优先；其次 MCP；未知工具返回错误字符串。
+        高风险未授权工具返回跳过提示，并附带 confirmation_required 事件。
+        extra_event 为 None 表示无需额外 SSE 事件。"""
+        call_id = f"call_{tc.get('_round', 0)}_{tc.get('_index', 0)}"
+        tool_def = tool_registry.get(tc["name"])
+        if tool_def:
+            if tool_def.risk == "high" and tc["name"] not in (agent.high_risk_tools_enabled or []):
+                tool_result = f"Tool '{tc['name']}' requires user confirmation. Skipped. Grant access in agent settings to enable it."
+                extra = {"event": "confirmation_required", "data": json.dumps({"tool": tc["name"], "arguments": tc["arguments"], "risk": "high"})}
+                return tool_result, extra
+            try:
+                args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                if not args and tc["name"] == "web_search":
+                    args = {"query": user_message}
+                elif not args:
+                    args = {}
+                result = await asyncio.wait_for(tool_def.function(**args), timeout=settings.tool_timeout)
+                return str(result), None
+            except asyncio.TimeoutError:
+                return f"Tool '{tc['name']}' timed out after {settings.tool_timeout}s", None
+            except Exception as e:
+                return f"Tool error: {e}", None
+        if mcp_manager.has_tool(tc["name"]):
+            try:
+                args = json.loads(tc["arguments"]) if tc["arguments"] else {}
+                out = await asyncio.wait_for(mcp_manager.call_tool(tc["name"], args), timeout=settings.tool_timeout)
+                return str(out), None
+            except asyncio.TimeoutError:
+                return f"MCP tool '{tc['name']}' timed out after {settings.tool_timeout}s", None
+            except Exception as e:
+                return f"MCP tool error: {e}", None
+        return f"Unknown tool: {tc['name']}", None
+
     async def run(self, db: AsyncSession, agent_id: str, conversation_id: str, user_message: str):
         logger.info("agent_run_start", extra={"agent_id": agent_id, "conversation_id": conversation_id, "msg_len": len(user_message)})
         agent_uuid = UUID(agent_id)
@@ -89,37 +151,18 @@ class AgentRuntime:
 
         # ── 加载历史消息和长期记忆 ──
         msg_result = await db.execute(
-            select(Message).where(Message.conversation_id == conv_uuid).order_by(Message.created_at.asc()).limit(20)
+            select(Message).where(Message.conversation_id == conv_uuid).order_by(Message.created_at.asc()).limit(agent.history_limit)
         )
         history = msg_result.scalars().all()
 
-        # 通过余弦相似度检索最相关的 top_k 条长期记忆
-        memories = await memory_manager.retrieve(db, agent_uuid, user_message)
+        # 通过余弦相似度检索最相关的 top_k 条长期记忆（按 Agent 配置覆盖全局默认）
+        memories = await memory_manager.retrieve(db, agent_uuid, user_message, top_k=agent.memory_top_k)
 
         # ── 加载已激活的技能，把 prompt_template 注入 system message ──
         skills = await self._load_skills(db, agent.skills)
 
         # ── 构建 LLM 消息列表 ──
-        system_content = agent.system_prompt
-        # 技能模板追加到 system prompt 末尾，作为额外指令
-        if skills:
-            skill_block = "\n\n".join(
-                f"# Skill: {s.name}\n{s.prompt_template}" for s in skills
-            )
-            system_content = f"{system_content}\n\n{skill_block}"
-        messages = [{"role": "system", "content": system_content}]
-        if agent.tools:
-            tool_names = ", ".join(agent.tools)
-            messages.append({
-                "role": "system",
-                "content": f"Available tools: {tool_names}. To use a tool, call the function with the required parameters. For web_search, always provide a 'query' parameter with your search query. IMPORTANT: After receiving tool results, ALWAYS provide a text response to the user summarizing what you found. Do not call the same tool with the same parameters repeatedly."
-            })
-        if memories:
-            memory_text = "Relevant context about the user:\n" + "\n".join(f"- {m}" for m in memories)
-            messages.append({"role": "system", "content": memory_text})
-        for msg in history:
-            messages.append({"role": msg.role, "content": msg.content})
-        messages.append({"role": "user", "content": user_message})
+        messages = self._build_messages(agent, skills, memories, history, user_message)
 
         # 立即保存用户消息，刷新页面也能看到
         user_msg = Message(conversation_id=conv_uuid, role="user", content=user_message)
@@ -133,7 +176,7 @@ class AgentRuntime:
         mcp_schemas = await mcp_manager.get_schemas(mcp_servers) if mcp_servers else []
         tools = (builtin_tools + mcp_schemas) or None
         api_base = provider.api_base if provider else None
-        api_key = provider.api_key if provider else None
+        api_key = decrypt(provider.api_key) if provider else None
         # 去掉末尾的 /chat/completions，litellm 内部会自己拼接
         if api_base and api_base.endswith("/chat/completions"):
             api_base = api_base[: -len("/chat/completions")]
@@ -174,42 +217,11 @@ class AgentRuntime:
                 for i, tc in enumerate(tool_calls_in_round):
                     # 唯一的 call_id 防止跨轮次模型混淆
                     call_id = f"call_{round_count}_{i}"
-                    tool_def = tool_registry.get(tc["name"])
-                    if tool_def:
-                        if tool_def.risk == "high" and tc["name"] not in (agent.high_risk_tools_enabled or []):
-                            # 高风险工具未授权：通知前端需要确认，并跳过执行
-                            tool_result = f"Tool '{tc['name']}' requires user confirmation. Skipped. Grant access in agent settings to enable it."
-                            yield {"event": "confirmation_required", "data": json.dumps({"tool": tc["name"], "arguments": tc["arguments"], "risk": "high"})}
-                        else:
-                            try:
-                                args = json.loads(tc["arguments"]) if tc["arguments"] else {}
-                                # web_search 兜底：没有显式参数时用用户消息作为搜索词
-                                if not args and tc["name"] == "web_search":
-                                    args = {"query": user_message}
-                                elif not args:
-                                    args = {}
-                                # 工具执行加超时保护，防止卡死拖垮整轮对话
-                                result = await asyncio.wait_for(
-                                    tool_def.function(**args), timeout=settings.tool_timeout
-                                )
-                                tool_result = str(result)
-                            except asyncio.TimeoutError:
-                                tool_result = f"Tool '{tc['name']}' timed out after {settings.tool_timeout}s"
-                            except Exception as e:
-                                tool_result = f"Tool error: {e}"
-                    elif mcp_manager.has_tool(tc["name"]):
-                        # 内置工具未命中时，交给 MCP 管理器分发到对应服务器
-                        try:
-                            args = json.loads(tc["arguments"]) if tc["arguments"] else {}
-                            tool_result = str(await asyncio.wait_for(
-                                mcp_manager.call_tool(tc["name"], args), timeout=settings.tool_timeout
-                            ))
-                        except asyncio.TimeoutError:
-                            tool_result = f"MCP tool '{tc['name']}' timed out after {settings.tool_timeout}s"
-                        except Exception as e:
-                            tool_result = f"MCP tool error: {e}"
-                    else:
-                        tool_result = f"Unknown tool: {tc['name']}"
+                    tc["_round"] = round_count
+                    tc["_index"] = i
+                    tool_result, extra_event = await self._execute_tool_call(agent, tc, user_message)
+                    if extra_event:
+                        yield extra_event
 
                     yield {"event": "tool_result", "data": json.dumps({"tool": tc["name"], "output": tool_result})}
                     # 追加到内存消息列表，供下一轮 LLM 调用使用
