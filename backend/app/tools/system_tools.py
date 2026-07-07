@@ -9,6 +9,7 @@ from app.tools.base import tool_registry
     description="Get the current date and time",
     parameters={"type": "object", "properties": {"timezone": {"type": "string", "description": "Timezone, e.g. Asia/Shanghai. Defaults to UTC."}}},
     risk="low",
+    category="system",
 )
 async def get_current_time(timezone: str = "UTC") -> str:
     """获取当前 UTC 时间"""
@@ -20,6 +21,7 @@ async def get_current_time(timezone: str = "UTC") -> str:
     description="Evaluate a mathematical expression",
     parameters={"type": "object", "properties": {"expression": {"type": "string", "description": "Math expression, e.g. '2 + 3 * 4'"}}, "required": ["expression"]},
     risk="low",
+    category="system",
 )
 async def calculator(expression: str) -> str:
     """安全地计算数学表达式。

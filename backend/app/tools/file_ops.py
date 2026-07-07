@@ -25,6 +25,7 @@ def _is_safe_path(path: str) -> bool:
     description="Read contents of a file",
     parameters={"type": "object", "properties": {"path": {"type": "string", "description": "Absolute path to the file"}}, "required": ["path"]},
     risk="medium",
+    category="file",
 )
 async def read_file(path: str) -> str:
     """读取文件内容，最多返回 4096 字符"""
@@ -46,6 +47,7 @@ async def read_file(path: str) -> str:
     description="Write content to a file",
     parameters={"type": "object", "properties": {"path": {"type": "string", "description": "Absolute path"}, "content": {"type": "string", "description": "Content to write"}}, "required": ["path", "content"]},
     risk="high",
+    category="file",
 )
 async def write_file(path: str, content: str) -> str:
     """写入文件内容，自动创建父目录。需要用户确认（高风险）。"""

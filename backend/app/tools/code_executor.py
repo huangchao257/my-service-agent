@@ -18,6 +18,7 @@ from app.tools.base import tool_registry
     description="Execute Python code in a subprocess",
     parameters={"type": "object", "properties": {"code": {"type": "string", "description": "Python code to execute"}, "language": {"type": "string", "description": "Only 'python' is supported"}}, "required": ["code"]},
     risk="high",
+    category="code",
 )
 async def execute_code(code: str, language: str = "python") -> str:
     """在隔离的子进程中执行 Python 代码。仅支持 Python，超时 30 秒。"""

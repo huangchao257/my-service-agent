@@ -9,12 +9,12 @@
  * Provider 和 Model 是级联选择：先选 Provider，再选该 Provider 下的模型。
  */
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Agent, ModelOption, MCPServer, Skill, api } from "@/lib/api";
+import { Agent, ModelOption, MCPServer, Skill, ToolInfo, api } from "@/lib/api";
 
 interface AgentFormProps {
   open: boolean;
@@ -22,9 +22,6 @@ interface AgentFormProps {
   onSave: (data: Partial<Agent>) => Promise<void>;
   agent?: Agent | null;
 }
-
-// 内置工具列表
-const BUILTIN_TOOLS = ["calculator", "get_current_time", "web_search", "read_file", "write_file", "execute_code"];
 
 export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
   const [name, setName] = useState(agent?.name || "");
@@ -40,12 +37,28 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
   const [models, setModels] = useState<ModelOption[]>([]);
   const [allMcpServers, setAllMcpServers] = useState<MCPServer[]>([]);
   const [allSkills, setAllSkills] = useState<Skill[]>([]);
+  const [allTools, setAllTools] = useState<ToolInfo[]>([]);
 
   useEffect(() => {
     api.listModels().then(setModels).catch(console.error);
     api.listMCPServers().then(setAllMcpServers).catch(console.error);
     api.listSkills().then(setAllSkills).catch(console.error);
+    api.listTools().then(setAllTools).catch(console.error);
   }, [open]);
+
+  // 按分类分组工具
+  const toolGroups = useMemo(() => {
+    const groups: Record<string, ToolInfo[]> = {};
+    for (const t of allTools) {
+      (groups[t.category] ||= []).push(t);
+    }
+    // 固定分类优先排序，其余按字母
+    const order = ["system", "web", "file", "code", "dev", "general"];
+    return Object.entries(groups).sort(([a], [b]) => {
+      const ia = order.indexOf(a), ib = order.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib) || a.localeCompare(b);
+    });
+  }, [allTools]);
 
   // 编辑时回填表单
   useEffect(() => {
@@ -105,17 +118,38 @@ export function AgentForm({ open, onClose, onSave, agent }: AgentFormProps) {
           {/* Temperature 滑块 */}
           <div><label className="text-sm font-medium">Temperature: {temperature}</label><input type="range" min="0" max="2" step="0.1" value={temperature} onChange={(e) => setTemperature(parseFloat(e.target.value))} className="w-full" /></div>
 
-          {/* 内置工具多选 */}
+          {/* 内置工具多选（按分类分组） */}
           <div>
             <label className="text-sm font-medium">Tools</label>
-            <div className="flex flex-wrap gap-2 mt-1">
-              {BUILTIN_TOOLS.map((tool) => (
-                <Button key={tool} variant={tools.includes(tool) ? "default" : "outline"} size="sm"
-                  onClick={() => setTools((prev) => prev.includes(tool) ? prev.filter((t) => t !== tool) : [...prev, tool])}>
-                  {tool}
-                </Button>
-              ))}
-            </div>
+            {toolGroups.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-1">Loading tools...</p>
+            ) : (
+              <div className="space-y-2 mt-1 max-h-48 overflow-y-auto rounded-md border p-2">
+                {toolGroups.map(([group, items]) => (
+                  <div key={group}>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-1">{group}</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {items.map((tool) => (
+                        <Button
+                          key={tool.name}
+                          variant={tools.includes(tool.name) ? "default" : "outline"}
+                          size="sm"
+                          className="text-xs"
+                          title={tool.description}
+                          onClick={() => setTools((prev) => prev.includes(tool.name) ? prev.filter((t) => t !== tool.name) : [...prev, tool.name])}
+                        >
+                          {tool.risk === "high" && <span className="mr-1 text-amber-500">⚠</span>}
+                          {tool.name}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {tools.length > 0 && (
+              <p className="text-xs text-muted-foreground mt-1">{tools.length} selected</p>
+            )}
           </div>
 
           {/* MCP Server 多选 */}

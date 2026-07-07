@@ -13,6 +13,7 @@ from app.tools.base import tool_registry
     description="Search the web for real-time information",
     parameters={"type": "object", "properties": {"query": {"type": "string", "description": "Search query"}, "max_results": {"type": "integer", "description": "Max results to return (1-10, default 5)"}}, "required": ["query"]},
     risk="low",
+    category="web",
 )
 async def web_search(query: str, max_results: int = 5) -> str:
     """使用 DuckDuckGo 搜索网页，按 href 去重，返回前 max_results 条。

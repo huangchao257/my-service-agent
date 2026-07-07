@@ -21,6 +21,7 @@ from app.api.mcp_servers import router as mcp_servers_router
 from app.api.skills import router as skills_router
 from app.api.memories import router as memories_router
 from app.api.llm_interactions import router as llm_interactions_router
+from app.api.tools import router as tools_router
 
 
 @asynccontextmanager
@@ -68,6 +69,7 @@ app.include_router(mcp_servers_router)     # MCP 服务器配置
 app.include_router(skills_router)          # 技能模板管理
 app.include_router(memories_router)        # 记忆查看/删除
 app.include_router(llm_interactions_router)  # LLM 交互记录
+app.include_router(tools_router)            # 内置工具发现
 
 
 @app.get("/api/health")

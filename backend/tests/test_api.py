@@ -339,3 +339,49 @@ async def test_provider_list_does_not_mutate_orm(db_session):
     await db_session.commit()
     await db_session.refresh(p)
     assert p.api_key == "sk-secret-1234567890"  # commit 后仍未被破坏
+
+
+@pytest.mark.asyncio
+async def test_list_tools(client):
+    """GET /api/tools 返回全部已注册工具，含开发工具"""
+    resp = await client.get("/api/tools")
+    assert resp.status_code == 200
+    names = [t["name"] for t in resp.json()]
+    # 内置工具
+    assert "calculator" in names and "web_search" in names
+    # 开发工具
+    assert "json_format" in names and "timestamp_to_date" in names
+    assert "uuid_generate" in names and "jwt_decode" in names
+    # 每个工具带 risk 字段
+    assert all("risk" in t for t in resp.json())
+    # 至少 15 种
+    assert len(names) >= 15
+
+
+@pytest.mark.asyncio
+async def test_list_tools_by_category(client):
+    """GET /api/tools?category=dev 只返回 dev 工具"""
+    resp = await client.get("/api/tools?category=dev")
+    assert resp.status_code == 200
+    names = [t["name"] for t in resp.json()]
+    assert "json_format" in names and "calculator" not in names
+    assert all(t["category"] == "dev" for t in resp.json())
+
+
+@pytest.mark.asyncio
+async def test_list_tools_categories_present(client):
+    """所有工具都带 category 字段，且覆盖多种分类"""
+    resp = await client.get("/api/tools")
+    cats = {t["category"] for t in resp.json()}
+    assert "system" in cats and "dev" in cats
+    assert "web" in cats and "file" in cats and "code" in cats
+
+
+@pytest.mark.asyncio
+async def test_list_tools_by_risk(client):
+    """GET /api/tools?risk=high 只返回高风险工具"""
+    resp = await client.get("/api/tools?risk=high")
+    names = [t["name"] for t in resp.json()]
+    assert "execute_code" in names
+    assert "write_file" in names
+    assert "calculator" not in names

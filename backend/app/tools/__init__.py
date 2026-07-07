@@ -9,6 +9,6 @@
 """
 
 from app.tools.base import tool_registry, ToolDefinition
-from app.tools import system_tools, web_search, file_ops, code_executor
+from app.tools import system_tools, web_search, file_ops, code_executor, dev_tools
 
 __all__ = ["tool_registry", "ToolDefinition"]

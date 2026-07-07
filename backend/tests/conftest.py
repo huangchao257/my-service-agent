@@ -9,18 +9,21 @@ from app.main import app
 from app.database import Base, get_db
 from app.core.cache import cache
 from app.core.rate_limit import rate_limiter
+from app.tools import tool_registry
 
 
 @pytest.fixture(autouse=True)
 def _reset_state():
-    """每个测试前重置全局单例（缓存、限流器），避免跨测试的脏数据。"""
+    """每个测试前重置全局单例（缓存、限流器、工具指标），避免跨测试的脏数据。"""
     cache._mode = None
     cache._redis = None
     cache._fallback._store.clear()
     rate_limiter._hits.clear()
+    tool_registry._metrics.clear()
     yield
     cache._fallback._store.clear()
     rate_limiter._hits.clear()
+    tool_registry._metrics.clear()
 
 
 @pytest_asyncio.fixture
