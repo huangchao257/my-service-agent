@@ -8,17 +8,19 @@ from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, Asyn
 from app.main import app
 from app.database import Base, get_db
 from app.core.cache import cache
+from app.core.rate_limit import rate_limiter
 
 
 @pytest.fixture(autouse=True)
-def _reset_cache():
-    """每个测试前重置全局缓存单例，避免跨测试的脏数据。
-    同步实现：直接清空内部状态，不依赖 async。"""
+def _reset_state():
+    """每个测试前重置全局单例（缓存、限流器），避免跨测试的脏数据。"""
     cache._mode = None
     cache._redis = None
     cache._fallback._store.clear()
+    rate_limiter._hits.clear()
     yield
     cache._fallback._store.clear()
+    rate_limiter._hits.clear()
 
 
 @pytest_asyncio.fixture

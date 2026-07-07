@@ -34,8 +34,20 @@ class ProviderResponse(BaseModel):
     name: str
     provider: str
     api_base: str
-    api_key: str         # 列表接口中已脱敏（前4位 + **** + 后4位）
+    api_key: str         # 列表/详情接口中已脱敏（前4位 + **** + 后4位）
     models: list[str]
     is_active: bool
 
     model_config = {"from_attributes": True}
+
+    @classmethod
+    def masked(cls, provider) -> "ProviderResponse":
+        """从 ORM 实例构造响应，并对 api_key 做脱敏处理。
+
+        关键：不修改 ORM 实例本身（旧实现直接改 p.api_key 会被后续 commit
+        误写回 DB，毁掉真实密钥）。这里在独立 Pydantic 实例上脱敏。"""
+        resp = cls.model_validate(provider)
+        key = resp.api_key
+        if key and len(key) > 8:
+            resp.api_key = key[:4] + "****" + key[-4:]
+        return resp
