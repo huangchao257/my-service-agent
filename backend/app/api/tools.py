@@ -31,3 +31,9 @@ async def list_tools(
         tools = [t for t in tools if t.risk == risk]
     return tools
 
+
+@router.get("/metrics")
+async def tool_metrics(db: AsyncSession = Depends(get_db)):
+    """返回各工具的调用次数、错误数、平均耗时，供运维观测。"""
+    return tool_registry.get_metrics()
+

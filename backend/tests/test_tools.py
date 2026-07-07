@@ -123,3 +123,28 @@ def test_validate_args_boolean_strictness():
     # password_generate 的 symbols 是 boolean
     err = tool_registry.validate_args("password_generate", {"length": 16, "symbols": "yes"})
     assert err and "boolean" in err
+
+
+def test_record_call_and_metrics():
+    """record_call 累计调用次数/耗时/错误，get_metrics 返回快照。"""
+    tool_registry.record_call("json_format", 10.0, success=True)
+    tool_registry.record_call("json_format", 30.0, success=True)
+    tool_registry.record_call("json_format", 5.0, success=False)
+    m = [x for x in tool_registry.get_metrics() if x["name"] == "json_format"][0]
+    assert m["calls"] == 3
+    assert m["errors"] == 1
+    assert m["total_ms"] == 45.0
+    assert m["avg_ms"] == 15.0
+
+
+@pytest.mark.asyncio
+async def test_metrics_endpoint(client):
+    """GET /api/tools/metrics 返回调用指标"""
+    # 触发一次工具调用（经 runtime 路径才会记录；这里直接 record_call 模拟）
+    from app.tools import tool_registry
+    tool_registry.record_call("calculator", 1.5, success=True)
+    resp = await client.get("/api/tools/metrics")
+    assert resp.status_code == 200
+    data = resp.json()
+    calc = [x for x in data if x["name"] == "calculator"][0]
+    assert calc["calls"] == 1 and calc["errors"] == 0

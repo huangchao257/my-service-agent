@@ -78,6 +78,14 @@ export interface ModelOption {
   provider_id: string;
 }
 
+export interface ToolInfo {
+  name: string;
+  description: string;
+  parameters: Record<string, unknown>;
+  risk: "low" | "medium" | "high";
+  category: string;
+}
+
 export interface Memory {
   id: string;
   agent_id: string;
@@ -167,6 +175,13 @@ export const api = {
   deleteProvider: (id: string) =>
     fetchJson<void>(`/api/providers/${id}`, { method: "DELETE" }),
   listModels: () => fetchJson<ModelOption[]>("/api/providers/models"),
+  listTools: (params?: { category?: string; risk?: string }) => {
+    const qs = new URLSearchParams();
+    if (params?.category) qs.set("category", params.category);
+    if (params?.risk) qs.set("risk", params.risk);
+    const q = qs.toString();
+    return fetchJson<ToolInfo[]>(`/api/tools${q ? `?${q}` : ""}`);
+  },
   testProvider: (id: string) =>
     fetchJson<{ ok: boolean; detail: string }>(`/api/providers/${id}/test`, { method: "POST" }),
   refreshProviderModels: (id: string) =>

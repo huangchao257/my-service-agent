@@ -25,6 +25,8 @@ class ToolRegistry:
 
     def __init__(self):
         self._tools: dict[str, ToolDefinition] = {}
+        # 调用指标：name -> {calls, total_ms, errors}
+        self._metrics: dict[str, dict] = {}
 
     def register(self, name: str, description: str, parameters: dict, risk: str = "low", category: str = "general"):
         """装饰器：注册一个新工具"""
@@ -35,6 +37,28 @@ class ToolRegistry:
             )
             return func
         return decorator
+
+    def record_call(self, name: str, duration_ms: float, success: bool) -> None:
+        """记录一次工具调用的指标。未注册的工具名也会记录，便于排查未知调用。"""
+        m = self._metrics.setdefault(name, {"calls": 0, "total_ms": 0.0, "errors": 0})
+        m["calls"] += 1
+        m["total_ms"] += duration_ms
+        if not success:
+            m["errors"] += 1
+
+    def get_metrics(self) -> list[dict]:
+        """返回所有工具的调用指标快照。"""
+        result = []
+        for name, m in self._metrics.items():
+            calls = m["calls"]
+            result.append({
+                "name": name,
+                "calls": calls,
+                "errors": m["errors"],
+                "total_ms": round(m["total_ms"], 2),
+                "avg_ms": round(m["total_ms"] / calls, 2) if calls else 0.0,
+            })
+        return result
 
     def get(self, name: str) -> ToolDefinition | None:
         """按名称获取工具定义"""

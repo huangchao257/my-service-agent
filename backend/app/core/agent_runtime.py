@@ -111,11 +111,21 @@ class AgentRuntime:
                 validation_error = tool_registry.validate_args(tc["name"], args)
                 if validation_error:
                     return f"Tool error: {validation_error}", None
-                result = await asyncio.wait_for(tool_def.function(**args), timeout=settings.tool_timeout)
-                return str(result), None
-            except asyncio.TimeoutError:
-                return f"Tool '{tc['name']}' timed out after {settings.tool_timeout}s", None
+                _t0 = time.time()
+                try:
+                    result = await asyncio.wait_for(tool_def.function(**args), timeout=settings.tool_timeout)
+                    _dur = (time.time() - _t0) * 1000
+                    tool_registry.record_call(tc["name"], _dur, success=True)
+                    return str(result), None
+                except asyncio.TimeoutError:
+                    tool_registry.record_call(tc["name"], settings.tool_timeout * 1000, success=False)
+                    return f"Tool '{tc['name']}' timed out after {settings.tool_timeout}s", None
+                except Exception as e:
+                    _dur = (time.time() - _t0) * 1000
+                    tool_registry.record_call(tc["name"], _dur, success=False)
+                    return f"Tool error: {e}", None
             except Exception as e:
+                # 捕获 json.loads / 参数解析阶段的错误
                 return f"Tool error: {e}", None
         if mcp_manager.has_tool(tc["name"]):
             try:
