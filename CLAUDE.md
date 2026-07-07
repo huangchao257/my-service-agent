@@ -33,7 +33,13 @@ docker compose up -d db         # 仅启动 PostgreSQL
 - `app/core/` — 核心引擎: `agent_runtime.py`（对话编排）、`llm_gateway.py`（litellm 封装+重试+token统计）、`memory_manager.py`（嵌入+余弦检索）、`mcp_manager.py`（MCP 工具聚合，mcp 库可选）、`cache.py`（Redis+内存降级）、`rate_limit.py`（令牌桶限流）、`crypto.py`（Fernet 静态加密）、`logging.py`（结构化 JSON 日志）
 - `app/models/` — SQLAlchemy ORM 模型（8 个表: agents/providers/conversations/messages/memories/mcp_servers/skills/llm_interactions）
 - `app/schemas/` — Pydantic 请求/响应模型
-- `app/tools/` — 内置工具注册中心（6 个工具: calculator/get_current_time/web_search/read_file/write_file/execute_code）
+- `app/tools/` — 内置工具注册中心（28 个工具，分 5 类）：
+  - system: calculator / get_current_time
+  - web: web_search
+  - file: read_file / write_file
+  - code: execute_code
+  - dev: json_format / json_validate / json_path / timestamp_to_date / date_to_timestamp / timestamp_now / uuid_generate / base64_encode / base64_decode / url_encode / url_decode / hash_text / regex_test / string_case_convert / text_stats / csv_to_json / number_base_convert / slugify / password_generate / color_convert / jwt_decode / yaml_json_convert
+  - `base.py` 提供 `ToolRegistry`（注册/get_schemas/list_all/validate_args/record_call/get_metrics）+ `ToolDefinition`（name/description/parameters/function/risk/category）
 - `app/database.py` — 异步 SQLAlchemy 引擎，`get_db()` 依赖注入，启动时 `create_all()`
 - `app/config.py` — pydantic-settings，从 `.env` 加载，支持 DATABASE_URL/REDIS_URL/LLM_TIMEOUT/LLM_MAX_RETRIES/TOOL_TIMEOUT/ENCRYPTION_KEY 等
 
@@ -43,7 +49,7 @@ docker compose up -d db         # 仅启动 PostgreSQL
 - **Agent 可配置上下文**：`history_limit`（每轮注入历史条数，默认 20）、`memory_top_k`（记忆检索条数，None 用全局默认）
 - **Skill 注入**：Agent.skills（技能名称列表）对应的 prompt_template 追加到 system message
 - **MCP 接入**：Agent.mcp_servers（名称列表）→ mcp_manager 拉取工具 schema 合并进 tools；工具调用时内置工具未命中则分发到 MCP
-- **工具调用循环**：agent_runtime 最多 `max_tool_rounds`（默认 10）轮，每轮流式调用 LLM → 检测 tool_calls → 执行工具（`asyncio.wait_for` 超时保护）→ 结果注入消息列表再调 LLM
+- **工具调用循环**：agent_runtime 最多 `max_tool_rounds`（默认 10）轮，每轮流式调用 LLM → 检测 tool_calls → 校验参数（`validate_args`）→ 执行工具（`asyncio.wait_for` 超时保护，记录调用指标）→ 结果注入消息列表再调 LLM
 - **工具调用唯一 ID**：`call_{round}_{index}` 防止跨轮次模型混淆
 - **工具结果截断**：2000 字符，防止模型死循环
 - **记忆存储**：余弦相似度去重（阈值 0.95），暴力搜索（无向量数据库），每次对话后 LLM 提取 1-3 条；`retrieve(top_k=...)` 可覆盖全局 top_k
@@ -63,6 +69,8 @@ docker compose up -d db         # 仅启动 PostgreSQL
 - `/api/memories` — GET 列表（支持 search 关键词）+ DELETE 单条
 - `/api/llm-interactions` — GET 分页列表 + GET 详情
 - `/api/mcp-servers` / `/api/skills` — CRUD + GET 单条
+- `/api/tools` — GET 列出全部已注册工具（支持 `?category=` / `?risk=` 筛选）
+- `/api/tools/metrics` — GET 各工具调用次数/错误/平均耗时
 - `/api/providers/models` — 汇总所有已激活 Provider 的模型列表（带缓存）
 - `/api/health` | `/api/health/deep` — 轻量 / 深度（DB+缓存）健康检查
 
