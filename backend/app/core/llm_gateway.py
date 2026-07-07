@@ -5,23 +5,65 @@ LLM 网关 — 封装 litellm 的薄层，统一处理所有模型交互。
 - 流式：yield {"type": "delta"|"tool_call"|"done"} 字典，供 SSE 推送
 - 非流式：直接返回完整的响应消息
 
-同时提供文本嵌入向量生成和交互日志记录功能。
-仅在传入 db/agent_id 参数时才记录交互 —
+瞬态错误（超时 / 限流 / 5xx）会按指数退避重试，最多 llm_max_retries 次。
+仅非流式调用在传入 db/agent_id 时自动记录交互日志 —
 流式调用需单独调用 record_interaction()，因为完整响应要等流结束后才能获得。
 """
 
 import json
 import time
+import asyncio
 from typing import AsyncIterator
 from uuid import UUID
 import litellm
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
+from app.core.logging import get_logger
 from app.models.llm_interaction import LLMInteraction
+
+logger = get_logger(__name__)
+
+
+def _is_transient(exc: Exception) -> bool:
+    """判断异常是否为可重试的瞬态错误（超时 / 限流 / 服务端 5xx / 连接错误）。
+
+    litellm 会把各提供商的错误归一为 openai 风格异常，这里按类名与状态码双重判断，
+    尽量宽松地捕获可重试场景，避免漏掉自定义提供商的异常类型。"""
+    name = type(exc).__name__
+    transient_names = {
+        "Timeout", "APITimeoutError",
+        "RateLimitError", "RateLimitExceededError",
+        "APIConnectionError", "ConnectionError", "ConnectionResetError",
+        "ServiceUnavailableError", "InternalServerError", "APIStatusError",
+    }
+    if name in transient_names:
+        return True
+    status = getattr(exc, "status_code", None) or getattr(exc, "statusCode", None)
+    if isinstance(status, int) and (status == 429 or status >= 500):
+        return True
+    return False
 
 
 class LLMGateway:
+    async def _call_with_retry(self, **kwargs):
+        """带指数退避的重试封装，仅重试瞬态错误。
+        流式调用重试的是“建立流”这一步；一旦开始迭代 chunk 则不再重试。"""
+        last_exc: Exception | None = None
+        for attempt in range(settings.llm_max_retries + 1):
+            try:
+                return await litellm.acompletion(**kwargs)
+            except Exception as exc:
+                last_exc = exc
+                # 非瞬态错误或已用尽重试次数，直接抛出
+                if not _is_transient(exc) or attempt == settings.llm_max_retries:
+                    raise
+                delay = settings.llm_retry_base_delay * (2 ** attempt)
+                logger.warning("llm_retry", extra={"attempt": attempt + 1, "delay": delay, "error": type(exc).__name__})
+                await asyncio.sleep(delay)
+        # 理论不可达：循环要么 return 要么 raise
+        raise last_exc  # pragma: no cover
+
     async def chat_completion(
         self,
         model: str,
@@ -56,7 +98,7 @@ class LLMGateway:
             return self._stream_response(**kwargs)
         else:
             start_time = time.time()
-            response = await litellm.acompletion(**kwargs)
+            response = await self._call_with_retry(**kwargs)
             duration_ms = int((time.time() - start_time) * 1000)
             # 非流式调用自动记录（用于标题生成、记忆提取等场景）
             if db and agent_id:
@@ -73,14 +115,19 @@ class LLMGateway:
 
     async def _stream_response(self, **kwargs) -> AsyncIterator[dict]:
         """流式 SSE 事件生成：delta（文本片段）→ tool_call → done。
-        tool_call 的 arguments 按 index 缓冲，因为 litellm 会分多个 chunk 下发。"""
-        response = await litellm.acompletion(**kwargs)
+        tool_call 的 arguments 按 index 缓冲，因为 litellm 会分多个 chunk 下发。
+        开启 stream_options.include_usage，使最终 chunk 携带 token 用量，
+        在 done 事件中一并返回，供上层记录到 llm_interactions。"""
+        # 请求服务端在末尾 chunk 附带 usage 统计
+        kwargs.setdefault("stream_options", {"include_usage": True})
+        response = await self._call_with_retry(**kwargs)
         tool_call_buffers: dict[int, dict] = {}
+        usage: dict | None = None
         async for chunk in response:
-            delta = chunk.choices[0].delta
-            if delta.content:
+            delta = chunk.choices[0].delta if chunk.choices else None
+            if delta and delta.content:
                 yield {"type": "delta", "content": delta.content}
-            if delta.tool_calls:
+            if delta and delta.tool_calls:
                 for tc in delta.tool_calls:
                     idx = tc.index
                     if idx not in tool_call_buffers:
@@ -89,10 +136,16 @@ class LLMGateway:
                         tool_call_buffers[idx]["name"] = tc.function.name
                     if tc.function and tc.function.arguments:
                         tool_call_buffers[idx]["arguments"] += tc.function.arguments
+            # usage 通常出现在 choices 为空的末尾 chunk
+            if getattr(chunk, "usage", None):
+                try:
+                    usage = chunk.usage.model_dump() if hasattr(chunk.usage, "model_dump") else dict(chunk.usage)
+                except Exception:
+                    usage = None
         for buf in tool_call_buffers.values():
             if buf["name"]:
                 yield {"type": "tool_call", "name": buf["name"], "arguments": buf["arguments"]}
-        yield {"type": "done"}
+        yield {"type": "done", "usage": usage}
 
     async def record_interaction(
         self, db: AsyncSession, agent_id: UUID, conversation_id: UUID | None,

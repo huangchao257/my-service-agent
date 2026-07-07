@@ -26,6 +26,16 @@ async def list_mcp_servers(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
+@router.get("/{server_id}", response_model=MCPServerResponse)
+async def get_mcp_server(server_id: UUID, db: AsyncSession = Depends(get_db)):
+    """获取单个 MCP 服务器配置详情"""
+    result = await db.execute(select(MCPServer).where(MCPServer.id == server_id))
+    server = result.scalar_one_or_none()
+    if not server:
+        raise HTTPException(status_code=404, detail="MCP server not found")
+    return server
+
+
 @router.post("", response_model=MCPServerResponse, status_code=201)
 async def create_mcp_server(data: MCPServerCreate, db: AsyncSession = Depends(get_db)):
     """创建新的 MCP 服务器配置"""

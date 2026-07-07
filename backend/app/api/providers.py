@@ -6,6 +6,7 @@ LLM Provider API — CRUD 接口 + 可用模型列表
 """
 
 from uuid import UUID
+import json
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -13,13 +14,27 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.provider import LLMProvider
 from app.schemas.provider import ProviderCreate, ProviderUpdate, ProviderResponse
+from app.core.cache import cache
 
 router = APIRouter(prefix="/api/providers", tags=["providers"])
+
+# 模型聚合列表的缓存键与 TTL
+_MODELS_CACHE_KEY = "providers:models:active"
+_MODELS_CACHE_TTL = 60  # 秒
 
 
 @router.get("/models")
 async def list_available_models(db: AsyncSession = Depends(get_db)):
-    """汇总所有已激活 Provider 的模型列表，供前端下拉选择"""
+    """汇总所有已激活 Provider 的模型列表，供前端下拉选择。
+
+    结果缓存 60 秒（Redis 不可用时降级到内存），任何 Provider 写操作都会失效缓存。"""
+    cached = await cache.get(_MODELS_CACHE_KEY)
+    if cached:
+        try:
+            return json.loads(cached)
+        except Exception:
+            pass  # 缓存损坏则回源
+
     result = await db.execute(
         select(LLMProvider).where(LLMProvider.is_active == True)
     )
@@ -33,6 +48,7 @@ async def list_available_models(db: AsyncSession = Depends(get_db)):
                 "provider_name": p.name,
                 "provider_id": str(p.id),
             })
+    await cache.set(_MODELS_CACHE_KEY, json.dumps(models), ttl=_MODELS_CACHE_TTL)
     return models
 
 
@@ -47,6 +63,18 @@ async def list_providers(db: AsyncSession = Depends(get_db)):
     return providers
 
 
+@router.get("/{provider_id}", response_model=ProviderResponse)
+async def get_provider(provider_id: UUID, db: AsyncSession = Depends(get_db)):
+    """获取单个 Provider 详情，API Key 脱敏"""
+    result = await db.execute(select(LLMProvider).where(LLMProvider.id == provider_id))
+    provider = result.scalar_one_or_none()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    if provider.api_key and len(provider.api_key) > 8:
+        provider.api_key = provider.api_key[:4] + "****" + provider.api_key[-4:]
+    return provider
+
+
 @router.post("", response_model=ProviderResponse, status_code=201)
 async def create_provider(data: ProviderCreate, db: AsyncSession = Depends(get_db)):
     """创建新的 LLM Provider 配置"""
@@ -54,6 +82,7 @@ async def create_provider(data: ProviderCreate, db: AsyncSession = Depends(get_d
     db.add(provider)
     await db.commit()
     await db.refresh(provider)
+    await cache.delete(_MODELS_CACHE_KEY)
     return provider
 
 
@@ -68,6 +97,7 @@ async def update_provider(provider_id: UUID, data: ProviderUpdate, db: AsyncSess
         setattr(provider, key, value)
     await db.commit()
     await db.refresh(provider)
+    await cache.delete(_MODELS_CACHE_KEY)
     return provider
 
 
@@ -80,3 +110,4 @@ async def delete_provider(provider_id: UUID, db: AsyncSession = Depends(get_db))
         raise HTTPException(status_code=404, detail="Provider not found")
     await db.delete(provider)
     await db.commit()
+    await cache.delete(_MODELS_CACHE_KEY)

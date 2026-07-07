@@ -25,6 +25,9 @@ class Agent(Base):
     tools: Mapped[list] = mapped_column(JSON, default=list)  # 该 Agent 可用的工具名称列表
     mcp_servers: Mapped[list] = mapped_column(JSON, default=list)
     skills: Mapped[list] = mapped_column(JSON, default=list)
+    # 高风险工具白名单：仅在此列表中的 high risk 工具会被实际执行；
+    # 其余高风险工具触发 confirmation_required 事件并被跳过，等待用户在前端授权。
+    high_risk_tools_enabled: Mapped[list] = mapped_column(JSON, default=list)
     temperature: Mapped[float] = mapped_column(Float, default=0.7)
     max_tokens: Mapped[int] = mapped_column(Integer, default=4096)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

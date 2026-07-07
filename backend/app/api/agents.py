@@ -24,6 +24,16 @@ async def list_agents(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
+@router.get("/{agent_id}", response_model=AgentResponse)
+async def get_agent(agent_id: UUID, db: AsyncSession = Depends(get_db)):
+    """获取单个 Agent 详情"""
+    result = await db.execute(select(Agent).where(Agent.id == agent_id))
+    agent = result.scalar_one_or_none()
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
+
+
 @router.post("", response_model=AgentResponse, status_code=201)
 async def create_agent(data: AgentCreate, db: AsyncSession = Depends(get_db)):
     """创建新的 Agent"""

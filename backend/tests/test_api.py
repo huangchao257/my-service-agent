@@ -78,3 +78,46 @@ async def test_list_conversations(client):
     resp = await client.get("/api/conversations")
     assert resp.status_code == 200
     assert len(resp.json()) == 1
+
+
+@pytest.mark.asyncio
+async def test_get_agent_by_id(client):
+    """GET /api/agents/{id} 返回单条 Agent，不存在时 404"""
+    create_resp = await client.post("/api/agents", json={"name": "Single", "model": "gpt-4o"})
+    agent_id = create_resp.json()["id"]
+    resp = await client.get(f"/api/agents/{agent_id}")
+    assert resp.status_code == 200
+    assert resp.json()["name"] == "Single"
+    not_found = await client.get(f"/api/agents/{__import__('uuid').uuid4()}")
+    assert not_found.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_provider_by_id_masked(client):
+    """GET /api/providers/{id} 返回脱敏后的 api_key"""
+    create_resp = await client.post("/api/providers", json={
+        "name": "OpenAI", "provider": "openai",
+        "api_base": "https://api.openai.com/v1", "api_key": "sk-test-1234567890",
+        "models": ["gpt-4o"],
+    })
+    pid = create_resp.json()["id"]
+    resp = await client.get(f"/api/providers/{pid}")
+    assert resp.status_code == 200
+    assert "****" in resp.json()["api_key"]
+
+
+@pytest.mark.asyncio
+async def test_get_skill_and_mcp_by_id(client):
+    """GET 单条 skill / mcp-server"""
+    skill_resp = await client.post("/api/skills", json={
+        "name": "coder", "prompt_template": "Be concise.", "category": "coding",
+    })
+    sid = skill_resp.json()["id"]
+    assert (await client.get(f"/api/skills/{sid}")).status_code == 200
+    assert (await client.get(f"/api/skills/{__import__('uuid').uuid4()}")).status_code == 404
+
+    mcp_resp = await client.post("/api/mcp-servers", json={
+        "name": "fs", "transport": "stdio", "command": "ls",
+    })
+    mid = mcp_resp.json()["id"]
+    assert (await client.get(f"/api/mcp-servers/{mid}")).status_code == 200

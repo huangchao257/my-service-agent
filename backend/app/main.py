@@ -9,6 +9,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.core.logging import setup_logging
 from app.database import init_db
 from app.api.agents import router as agents_router
 from app.api.providers import router as providers_router
@@ -22,7 +23,8 @@ from app.api.llm_interactions import router as llm_interactions_router
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
-    """应用生命周期：启动时初始化数据库"""
+    """应用生命周期：启动时初始化日志与数据库"""
+    setup_logging()
     await init_db()
     yield
 
