@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # LLM 调用超时（秒）
     llm_timeout: int = 60
 
+    # LLM 瞬态错误最大重试次数（超时 / 限流 / 5xx）
+    llm_max_retries: int = 3
+
+    # 重试退避基础延迟（秒），实际延迟 = base * 2**attempt
+    llm_retry_base_delay: float = 1.0
+
     # 单个工具执行超时（秒）
     tool_timeout: int = 30
 

@@ -90,7 +90,7 @@ export default function SettingsPage() {
               <Button size="sm" onClick={() => { setEditingProvider(null); setProviderFormOpen(true); }}><Plus className="mr-2 h-4 w-4" />Add Provider</Button>
             </div>
             <div className="space-y-3">
-              {providers.map((p) => <ProviderCard key={p.id} provider={p} onEdit={(pr) => { setEditingProvider(pr); setProviderFormOpen(true); }} onDelete={async (id) => { await api.deleteProvider(id); loadProviders(); }} />)}
+              {providers.map((p) => <ProviderCard key={p.id} provider={p} onEdit={(pr) => { setEditingProvider(pr); setProviderFormOpen(true); }} onDelete={async (id) => { await api.deleteProvider(id); loadProviders(); }} onChanged={loadProviders} />)}
               {providers.length === 0 && <p className="text-muted-foreground text-center py-8">No providers configured.</p>}
             </div>
           </div>

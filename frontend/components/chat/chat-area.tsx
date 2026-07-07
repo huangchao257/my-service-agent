@@ -21,7 +21,8 @@ import { useSSE } from "@/hooks/use-sse";
 import { MessageBubble } from "./message-bubble";
 import { MessageInput } from "./message-input";
 import { ToolCallCard } from "./tool-call-card";
-import { Bot, Sparkles, Loader2 } from "lucide-react";
+import { Bot, Sparkles, Loader2, RotateCcw } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 interface ChatAreaProps {
   agent: Agent | null;
@@ -39,7 +40,8 @@ export function ChatArea({ agent, conversation, onTitleUpdated }: ChatAreaProps)
   const [toolCalls, setToolCalls] = useState<ToolCallEvent[]>([]);
   const [streamingContent, setStreamingContent] = useState("");  // 当前流式文本
   const [error, setError] = useState("");
-  const { isStreaming, startStream, stopStream } = useSSE();
+  const [confirmations, setConfirmations] = useState<{ tool: string; args: string; id: string }[]>([]);
+  const { isStreaming, startStream, regenerate, stopStream } = useSSE();
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeConvRef = useRef<string | null>(null);  // 当前活跃会话 ID，防止 SSE 串扰
 
@@ -77,6 +79,7 @@ export function ChatArea({ agent, conversation, onTitleUpdated }: ChatAreaProps)
     setStreamingContent("");
     setToolCalls([]);
     setError("");
+    setConfirmations([]);
 
     let assistantContent = "";
     startStream(
@@ -112,8 +115,63 @@ export function ChatArea({ agent, conversation, onTitleUpdated }: ChatAreaProps)
         if (activeConvRef.current !== convId) return;
         onTitleUpdated?.(title);
       },
+      // confirmation_required 回调：高风险工具未授权
+      (tool, args) => {
+        if (activeConvRef.current !== convId) return;
+        setConfirmations((prev) => [...prev, { id: `cf${++msgCounter}`, tool, args }]);
+      },
     );
   }, [agent, conversation, startStream, onTitleUpdated]);
+
+  // 重生最后一轮：删除末尾 assistant 消息，用原 user 文本重跑（后端负责裁剪历史）
+  const handleRegenerate = useCallback(() => {
+    if (!agent || !conversation || isStreaming) return;
+    const convId = conversation.id;
+    activeConvRef.current = convId;
+
+    // 找到最后一条 assistant 消息并移除（后端会重新生成）
+    let lastUserContent = "";
+    setMessages((prev) => {
+      const next = [...prev];
+      // 从末尾找最后一条 assistant
+      while (next.length && next[next.length - 1].role !== "assistant") next.pop();
+      if (next.length) next.pop();  // 移除该 assistant
+      // 找最后一条 user 文本（仅用于本地占位显示）
+      for (let i = next.length - 1; i >= 0; i--) {
+        if (next[i].role === "user") { lastUserContent = next[i].content; break; }
+      }
+      return next;
+    });
+    setStreamingContent("");
+    setToolCalls([]);
+    setError("");
+
+    let assistantContent = "";
+    regenerate(conversation.id, agent.id, {
+      onDelta: (delta) => {
+        if (activeConvRef.current !== convId) return;
+        assistantContent += delta; setStreamingContent(assistantContent);
+      },
+      onToolCall: (name, args) => {
+        if (activeConvRef.current !== convId) return;
+        setToolCalls((prev) => [...prev, { id: `tc${++msgCounter}`, name, args, isExecuting: true }]);
+      },
+      onToolResult: (tool, output) => {
+        if (activeConvRef.current !== convId) return;
+        setToolCalls((prev) => prev.map((tc) => tc.name === tool && tc.isExecuting ? { ...tc, output, isExecuting: false } : tc));
+      },
+      onDone: () => {
+        if (activeConvRef.current !== convId) return;
+        if (assistantContent) setMessages((prev) => [...prev, { id: `a${++msgCounter}`, role: "assistant", content: assistantContent }]);
+        setStreamingContent("");
+      },
+      onError: (errMsg) => {
+        if (activeConvRef.current !== convId) return;
+        setError(errMsg); setStreamingContent("");
+      },
+      onTitleUpdated: (title) => { if (activeConvRef.current === convId) onTitleUpdated?.(title); },
+    });
+  }, [agent, conversation, isStreaming, regenerate, onTitleUpdated]);
 
   // 合并消息和中间工具调用卡片的渲染列表
   const messageList = useMemo(() => {
@@ -175,7 +233,21 @@ export function ChatArea({ agent, conversation, onTitleUpdated }: ChatAreaProps)
           )}
 
           {/* 历史消息 */}
-          {messages.map((msg) => <MessageBubble key={msg.id} role={msg.role} content={msg.content} />)}
+          {messages.map((msg, i) => {
+            const isLastAssistant = msg.role === "assistant" && i === messages.length - 1;
+            return (
+              <div key={msg.id}>
+                <MessageBubble role={msg.role} content={msg.content} />
+                {isLastAssistant && !isStreaming && (
+                  <div className="flex justify-start mb-2">
+                    <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={handleRegenerate}>
+                      <RotateCcw className="mr-1 h-3 w-3" />Regenerate
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })}
 
           {/* 工具调用卡片 */}
           {toolCalls.map((tc) => <ToolCallCard key={tc.id} name={tc.name} args={tc.args} output={tc.output} isExecuting={tc.isExecuting} />)}
@@ -199,6 +271,13 @@ export function ChatArea({ agent, conversation, onTitleUpdated }: ChatAreaProps)
               {error}
             </div>
           )}
+
+          {/* 高风险工具未授权提示 */}
+          {confirmations.map((cf) => (
+            <div key={cf.id} className="my-3 p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-sm text-amber-700 dark:text-amber-400 animate-fade-in">
+              <span className="font-medium">⚠ 需要授权：</span>工具 <code className="font-mono">{cf.tool}</code> 属于高风险操作，已被跳过。请在 Agent 设置中将其加入「高风险工具白名单」后再试。
+            </div>
+          ))}
 
           <div ref={scrollRef} />
         </div>

@@ -25,7 +25,14 @@ class Agent(Base):
     tools: Mapped[list] = mapped_column(JSON, default=list)  # 该 Agent 可用的工具名称列表
     mcp_servers: Mapped[list] = mapped_column(JSON, default=list)
     skills: Mapped[list] = mapped_column(JSON, default=list)
+    # 高风险工具白名单：仅在此列表中的 high risk 工具会被实际执行；
+    # 其余高风险工具触发 confirmation_required 事件并被跳过，等待用户在前端授权。
+    high_risk_tools_enabled: Mapped[list] = mapped_column(JSON, default=list)
     temperature: Mapped[float] = mapped_column(Float, default=0.7)
     max_tokens: Mapped[int] = mapped_column(Integer, default=4096)
+    # 每轮注入 LLM 的历史消息条数上限（避免上下文膨胀）
+    history_limit: Mapped[int] = mapped_column(Integer, default=20)
+    # 检索长期记忆时返回的条数；None 表示用全局 settings.memory_top_k
+    memory_top_k: Mapped[int | None] = mapped_column(Integer, nullable=True, default=None)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

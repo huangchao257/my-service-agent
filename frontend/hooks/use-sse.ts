@@ -7,47 +7,49 @@
  *   delta → 文本增量
  *   tool_call → 工具调用
  *   tool_result → 工具结果
+ *   confirmation_required → 高风险工具需用户确认
  *   title_updated → 会话标题更新
- *   done → 对话完成
+ *   done → 对话完成（可携带 token_usage）
  *   error → 错误
  *
- * 提供 startStream 和 stopStream 方法，支持取消正在进行的请求。
+ * 提供 startStream（发送新消息）、regenerate（重生最后一轮）、stopStream 方法。
  */
 
 import { useCallback, useRef, useState } from "react";
+
+const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+
+export interface StreamCallbacks {
+  onDelta: (content: string) => void;
+  onToolCall: (name: string, args: string) => void;
+  onToolResult: (tool: string, output: string) => void;
+  onDone: (tokenUsage?: unknown) => void;
+  onError: (msg: string) => void;
+  onTitleUpdated?: (title: string) => void;
+  onConfirmationRequired?: (tool: string, args: string) => void;
+}
 
 export function useSSE() {
   const [isStreaming, setIsStreaming] = useState(false);
   const readerRef = useRef<ReadableStreamDefaultReader<Uint8Array> | null>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  const startStream = useCallback(
-    async (
-      conversationId: string,
-      agentId: string,
-      message: string,
-      onDelta: (content: string) => void,
-      onToolCall: (name: string, args: string) => void,
-      onToolResult: (tool: string, output: string) => void,
-      onDone: () => void,
-      onError: (msg: string) => void,
-      onTitleUpdated?: (title: string) => void,
-    ) => {
+  const runStream = useCallback(
+    async (url: string, body: unknown, convId: string, cb: StreamCallbacks) => {
       setIsStreaming(true);
       const abort = new AbortController();
       abortRef.current = abort;
 
       try {
-        const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-        const res = await fetch(`${API_URL}/api/chat/${conversationId}`, {
+        const res = await fetch(url, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ message, agent_id: agentId }),
+          body: JSON.stringify(body),
           signal: abort.signal,
         });
 
         if (!res.ok || !res.body) {
-          onError(`HTTP ${res.status}`);
+          cb.onError(`HTTP ${res.status}`);
           setIsStreaming(false);
           return;
         }
@@ -75,21 +77,25 @@ export function useSSE() {
               // 根据事件类型分发到不同的回调
               if (eventType === "delta") {
                 const parsed = JSON.parse(data);
-                onDelta(parsed.content);
+                cb.onDelta(parsed.content);
               } else if (eventType === "tool_call") {
                 const parsed = JSON.parse(data);
-                onToolCall(parsed.name, parsed.arguments);
+                cb.onToolCall(parsed.name, parsed.arguments);
               } else if (eventType === "tool_result") {
                 const parsed = JSON.parse(data);
-                onToolResult(parsed.tool, parsed.output);
+                cb.onToolResult(parsed.tool, parsed.output);
+              } else if (eventType === "confirmation_required") {
+                const parsed = JSON.parse(data);
+                cb.onConfirmationRequired?.(parsed.tool, parsed.arguments);
               } else if (eventType === "done") {
-                onDone();
+                const parsed = JSON.parse(data);
+                cb.onDone(parsed.token_usage);
               } else if (eventType === "title_updated") {
                 const parsed = JSON.parse(data);
-                onTitleUpdated?.(parsed.title);
+                cb.onTitleUpdated?.(parsed.title);
               } else if (eventType === "error") {
                 const parsed = JSON.parse(data);
-                onError(parsed.message);
+                cb.onError(parsed.message);
               }
             }
           }
@@ -97,13 +103,57 @@ export function useSSE() {
       } catch (err: unknown) {
         // AbortError 是用户主动取消，不需要报错
         if (err instanceof Error && err.name !== "AbortError") {
-          onError(err.message);
+          cb.onError(err.message);
         }
       } finally {
         setIsStreaming(false);
       }
     },
-    []
+    [],
+  );
+
+  const startStream = useCallback(
+    async (
+      conversationId: string,
+      agentId: string,
+      message: string,
+      onDelta: (content: string) => void,
+      onToolCall: (name: string, args: string) => void,
+      onToolResult: (tool: string, output: string) => void,
+      onDone: () => void,
+      onError: (msg: string) => void,
+      onTitleUpdated?: (title: string) => void,
+      onConfirmationRequired?: (tool: string, args: string) => void,
+    ) => {
+      const convId = conversationId;
+      await runStream(
+        `${API_URL}/api/chat/${conversationId}`,
+        { message, agent_id: agentId },
+        convId,
+        {
+          onDelta, onToolCall, onToolResult,
+          onDone: () => onDone(),
+          onError, onTitleUpdated, onConfirmationRequired,
+        },
+      );
+    },
+    [runStream],
+  );
+
+  const regenerate = useCallback(
+    async (
+      conversationId: string,
+      agentId: string,
+      cb: StreamCallbacks,
+    ) => {
+      await runStream(
+        `${API_URL}/api/chat/${conversationId}/regenerate`,
+        { agent_id: agentId },
+        conversationId,
+        cb,
+      );
+    },
+    [runStream],
   );
 
   const stopStream = useCallback(() => {
@@ -112,5 +162,5 @@ export function useSSE() {
     setIsStreaming(false);
   }, []);
 
-  return { isStreaming, startStream, stopStream };
+  return { isStreaming, startStream, regenerate, stopStream };
 }

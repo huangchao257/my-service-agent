@@ -35,9 +35,9 @@ class MemoryManager:
             return 0.0
         return dot / (norm_a * norm_b)
 
-    async def retrieve(self, db: AsyncSession, agent_id: UUID, query: str) -> list[str]:
+    async def retrieve(self, db: AsyncSession, agent_id: UUID, query: str, top_k: int | None = None) -> list[str]:
         """返回与查询最相关的 top_k 条记忆内容。
-        嵌入生成失败时返回空列表。"""
+        top_k 显式传入时覆盖全局默认；嵌入生成失败时返回空列表。"""
         try:
             embedding = await llm_gateway.get_embedding(query)
         except Exception:
@@ -56,7 +56,8 @@ class MemoryManager:
                 pass
 
         scored.sort(key=lambda x: x[0], reverse=True)
-        return [content for _, content in scored[:settings.memory_top_k]]
+        limit = top_k if top_k is not None else settings.memory_top_k
+        return [content for _, content in scored[:limit]]
 
     async def store(self, db: AsyncSession, agent_id: UUID, content: str, conversation_id: UUID | None = None, api_base: str | None = None, api_key: str | None = None):
         """存储一条记忆。如果已存在高度相似记录（余弦 > 0.95），

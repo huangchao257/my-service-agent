@@ -9,8 +9,9 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { MessageSquare, Trash2, Plus } from "lucide-react";
+import { MessageSquare, Trash2, Plus, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { api, Conversation } from "@/lib/api";
 import { isToday, isYesterday } from "date-fns";
@@ -25,14 +26,15 @@ interface ConversationListProps {
 
 export function ConversationList({ agentId, activeId, onSelect, onNew, refreshKey }: ConversationListProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [search, setSearch] = useState("");
 
   useEffect(() => {
     if (agentId) {
-      api.listConversations(agentId).then(setConversations).catch(console.error);
+      api.listConversations(agentId, search || undefined).then(setConversations).catch(console.error);
     } else {
       setConversations([]);
     }
-  }, [agentId, refreshKey]);
+  }, [agentId, refreshKey, search]);
 
   const handleDelete = useCallback(async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();  // 防止冒泡触发选中
@@ -54,10 +56,19 @@ export function ConversationList({ agentId, activeId, onSelect, onNew, refreshKe
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3">
+      <div className="p-3 space-y-2">
         <Button className="w-full rounded-xl" onClick={onNew} disabled={!agentId} size="sm">
           <Plus className="mr-2 h-4 w-4" />New Chat
         </Button>
+        <div className="relative">
+          <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search chats..."
+            className="h-8 pl-7 text-sm rounded-lg"
+          />
+        </div>
       </div>
       <ScrollArea className="flex-1 px-3 custom-scrollbar">
         {groups.map(([group, convs]) => (

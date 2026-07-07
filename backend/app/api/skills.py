@@ -24,6 +24,16 @@ async def list_skills(db: AsyncSession = Depends(get_db)):
     return result.scalars().all()
 
 
+@router.get("/{skill_id}", response_model=SkillResponse)
+async def get_skill(skill_id: UUID, db: AsyncSession = Depends(get_db)):
+    """获取单个技能详情"""
+    result = await db.execute(select(Skill).where(Skill.id == skill_id))
+    skill = result.scalar_one_or_none()
+    if not skill:
+        raise HTTPException(status_code=404, detail="Skill not found")
+    return skill
+
+
 @router.post("", response_model=SkillResponse, status_code=201)
 async def create_skill(data: SkillCreate, db: AsyncSession = Depends(get_db)):
     """创建新技能"""

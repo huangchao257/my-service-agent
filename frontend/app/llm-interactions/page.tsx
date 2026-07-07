@@ -12,7 +12,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ChevronDown, ChevronUp, Clock, MessageSquare, Cpu, AlertCircle } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronUp, Clock, MessageSquare, Cpu, AlertCircle, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Agent, Conversation, LLMInteraction, api } from "@/lib/api";
@@ -165,6 +165,15 @@ export default function LLMInteractionsPage() {
                       {item.duration_ms != null && (
                         <span className="flex items-center gap-1"><Clock className="h-3 w-3" />{(item.duration_ms / 1000).toFixed(1)}s</span>
                       )}
+                      {item.token_usage_json && (() => {
+                        try {
+                          const u = JSON.parse(item.token_usage_json);
+                          if (u && u.total_tokens != null) {
+                            return <span className="flex items-center gap-1"><Sparkles className="h-3 w-3" />{u.total_tokens} tok</span>;
+                          }
+                        } catch { /* ignore */ }
+                        return null;
+                      })()}
                       <span>{new Date(item.created_at).toLocaleString("zh-CN")}</span>
                       {expandedId === item.id ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                     </div>
