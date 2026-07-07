@@ -107,6 +107,10 @@ class AgentRuntime:
                     args = {"query": user_message}
                 elif not args:
                     args = {}
+                # 执行前按 JSON Schema 校验参数（缺失必填/类型不符），给出清晰错误
+                validation_error = tool_registry.validate_args(tc["name"], args)
+                if validation_error:
+                    return f"Tool error: {validation_error}", None
                 result = await asyncio.wait_for(tool_def.function(**args), timeout=settings.tool_timeout)
                 return str(result), None
             except asyncio.TimeoutError:

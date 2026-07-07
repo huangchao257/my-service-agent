@@ -31,6 +31,7 @@ from app.tools.base import tool_registry
         "required": ["json_str"],
     },
     risk="low",
+    category="dev",
 )
 async def json_format(json_str: str, indent: int = 2) -> str:
     """格式化 JSON 字符串。indent<=0 时压缩为单行。"""
@@ -52,6 +53,7 @@ async def json_format(json_str: str, indent: int = 2) -> str:
         "required": ["json_str"],
     },
     risk="low",
+    category="dev",
 )
 async def json_validate(json_str: str) -> str:
     """校验 JSON 合法性，返回 ok 或错误位置信息。"""
@@ -76,6 +78,7 @@ async def json_validate(json_str: str) -> str:
         "required": ["json_str", "path"],
     },
     risk="low",
+    category="dev",
 )
 async def json_path(json_str: str, path: str) -> str:
     """按点路径从 JSON 中取值。支持 a.b[0].c 形式。"""
@@ -123,6 +126,7 @@ def _ts_to_datetime(ts: float) -> datetime:
         "required": ["timestamp"],
     },
     risk="low",
+    category="dev",
 )
 async def timestamp_to_date(timestamp: float, timezone_offset: int = 0) -> str:
     """时间戳 → ISO 字符串，自动识别秒/毫秒，支持时区偏移。"""
@@ -144,6 +148,7 @@ async def timestamp_to_date(timestamp: float, timezone_offset: int = 0) -> str:
         "required": ["date_str"],
     },
     risk="low",
+    category="dev",
 )
 async def date_to_timestamp(date_str: str) -> str:
     """日期字符串 → Unix 秒时间戳。支持 ISO 与常见格式。"""
@@ -161,6 +166,7 @@ async def date_to_timestamp(date_str: str) -> str:
     description="Get the current Unix timestamp in both seconds and milliseconds.",
     parameters={"type": "object", "properties": {}},
     risk="low",
+    category="dev",
 )
 async def timestamp_now() -> str:
     """返回当前 Unix 时间戳（秒 + 毫秒）。"""
@@ -178,6 +184,7 @@ async def timestamp_now() -> str:
         "properties": {"count": {"type": "integer", "description": "Number of UUIDs to generate (1-100, default 1)"}},
     },
     risk="low",
+    category="dev",
 )
 async def uuid_generate(count: int = 1) -> str:
     """生成 UUID v4。count 夹到 [1,100]。"""
@@ -194,6 +201,7 @@ async def uuid_generate(count: int = 1) -> str:
         "required": ["text"],
     },
     risk="low",
+    category="dev",
 )
 async def base64_encode(text: str) -> str:
     """UTF-8 文本 → Base64。"""
@@ -209,6 +217,7 @@ async def base64_encode(text: str) -> str:
         "required": ["b64"],
     },
     risk="low",
+    category="dev",
 )
 async def base64_decode(b64: str) -> str:
     """Base64 → UTF-8 文本。"""
@@ -227,6 +236,7 @@ async def base64_decode(b64: str) -> str:
         "required": ["text"],
     },
     risk="low",
+    category="dev",
 )
 async def url_encode(text: str) -> str:
     """文本 → URL 百分号编码。"""
@@ -242,6 +252,7 @@ async def url_encode(text: str) -> str:
         "required": ["text"],
     },
     risk="low",
+    category="dev",
 )
 async def url_decode(text: str) -> str:
     """URL 百分号编码 → 原文。"""
@@ -260,6 +271,7 @@ async def url_decode(text: str) -> str:
         "required": ["text"],
     },
     risk="low",
+    category="dev",
 )
 async def hash_text(text: str, algorithm: str = "sha256") -> str:
     """计算文本哈希。支持 md5/sha1/sha256。"""
@@ -284,6 +296,7 @@ async def hash_text(text: str, algorithm: str = "sha256") -> str:
         "required": ["pattern", "text"],
     },
     risk="low",
+    category="dev",
 )
 async def regex_test(pattern: str, text: str, flags: str = "") -> str:
     """用正则匹配文本，返回所有匹配及其分组。"""
@@ -325,6 +338,7 @@ async def regex_test(pattern: str, text: str, flags: str = "") -> str:
         "required": ["text", "to_case"],
     },
     risk="low",
+    category="dev",
 )
 async def string_case_convert(text: str, to_case: str) -> str:
     """在不同命名风格间转换。"""
@@ -358,6 +372,7 @@ async def string_case_convert(text: str, to_case: str) -> str:
         "required": ["text"],
     },
     risk="low",
+    category="dev",
 )
 async def text_stats(text: str) -> str:
     """统计字符/单词/行数/句子数。"""
@@ -380,6 +395,7 @@ async def text_stats(text: str) -> str:
         "required": ["csv_text"],
     },
     risk="low",
+    category="dev",
 )
 async def csv_to_json(csv_text: str, delimiter: str = ",") -> str:
     """CSV → JSON 数组（首行为表头）。"""
@@ -405,6 +421,7 @@ async def csv_to_json(csv_text: str, delimiter: str = ",") -> str:
         "required": ["value"],
     },
     risk="low",
+    category="dev",
 )
 async def number_base_convert(value: str, from_base: str = "") -> str:
     """数值在 bin/dec/hex/oct 间转换。from_base 留空则按前缀自动识别。"""
@@ -436,6 +453,7 @@ async def number_base_convert(value: str, from_base: str = "") -> str:
         "required": ["text"],
     },
     risk="low",
+    category="dev",
 )
 async def slugify(text: str) -> str:
     """文本 → URL slug。非 ASCII 字符做音译近似。"""
@@ -461,6 +479,7 @@ async def slugify(text: str) -> str:
         },
     },
     risk="low",
+    category="dev",
 )
 async def password_generate(length: int = 16, symbols: bool = True, numbers: bool = True, uppercase: bool = True) -> str:
     """生成安全随机密码。使用 secrets 模块。"""
@@ -494,6 +513,7 @@ async def password_generate(length: int = 16, symbols: bool = True, numbers: boo
         "required": ["value", "to_format"],
     },
     risk="low",
+    category="dev",
 )
 async def color_convert(value: str, to_format: str) -> str:
     """hex ↔ rgb 互转。"""
@@ -528,6 +548,7 @@ async def color_convert(value: str, to_format: str) -> str:
         "required": ["token"],
     },
     risk="low",
+    category="dev",
 )
 async def jwt_decode(token: str) -> str:
     """解码 JWT 的 header 与 payload（不验证签名）。"""
@@ -557,6 +578,7 @@ async def jwt_decode(token: str) -> str:
         "required": ["text", "direction"],
     },
     risk="low",
+    category="dev",
 )
 async def yaml_json_convert(text: str, direction: str) -> str:
     """YAML ↔ JSON 互转。依赖 pyyaml（未安装时返回错误）。"""

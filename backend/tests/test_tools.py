@@ -90,3 +90,36 @@ async def test_web_search_max_results_clamped(monkeypatch):
     from app.tools.web_search import web_search
     await web_search("q", max_results=999)
     assert captured["asked"] == 20  # 夹到 10 后 *2
+
+
+def test_validate_args_missing_required():
+    """缺必填参数时报错"""
+    err = tool_registry.validate_args("calculator", {})
+    assert err and "expression" in err
+
+
+def test_validate_args_ok_and_coercion():
+    """类型正确通过；字符串数字能温和强转为 integer"""
+    assert tool_registry.validate_args("calculator", {"expression": "1+1"}) is None
+    # json_format 的 indent 是 integer，传 "4" 应被强转通过
+    err = tool_registry.validate_args("json_format", {"json_str": "{}", "indent": "4"})
+    assert err is None
+
+
+def test_validate_args_wrong_type():
+    """类型不符且无法强转时报错"""
+    # expression 应为 string，传数字会被强转为 str（不报错）
+    assert tool_registry.validate_args("calculator", {"expression": 123}) is None
+    # json_path 的 path 也是 string
+    assert tool_registry.validate_args("json_path", {"json_str": "{}", "path": 1}) is None
+
+
+def test_validate_args_unknown_tool():
+    assert "Unknown tool" in tool_registry.validate_args("nope", {})
+
+
+def test_validate_args_boolean_strictness():
+    """boolean 参数不接受非布尔值"""
+    # password_generate 的 symbols 是 boolean
+    err = tool_registry.validate_args("password_generate", {"length": 16, "symbols": "yes"})
+    assert err and "boolean" in err
