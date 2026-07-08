@@ -11,7 +11,7 @@
  * 使用 shrink-0 确保导航区不随会话列表滚动。
  */
 
-import { Bot, Settings, PanelLeft, Brain, Cpu } from "lucide-react";
+import { Bot, Settings, PanelLeft, Brain, Cpu, Wrench } from "lucide-react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -53,6 +53,11 @@ export function Sidebar({
         <Link href="/agents">
           <Button variant="ghost" className="w-full justify-start text-sm text-muted-foreground hover:text-foreground">
             <Bot className="mr-2 h-4 w-4" />Manage Agents
+          </Button>
+        </Link>
+        <Link href="/tools">
+          <Button variant="ghost" className="w-full justify-start text-sm text-muted-foreground hover:text-foreground">
+            <Wrench className="mr-2 h-4 w-4" />工具广场
           </Button>
         </Link>
         <Link href="/settings">
