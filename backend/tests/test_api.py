@@ -385,3 +385,59 @@ async def test_list_tools_by_risk(client):
     assert "execute_code" in names
     assert "write_file" in names
     assert "calculator" not in names
+
+
+@pytest.mark.asyncio
+async def test_run_tool_ok(client):
+    """POST /api/tools/{name}/run 正常执行并返回结果"""
+    resp = await client.post("/api/tools/calculator/run", json={"args": {"expression": "2+3*4"}})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert data["result"] == "14"
+    assert data["duration_ms"] >= 0
+
+
+@pytest.mark.asyncio
+async def test_run_tool_validation_error(client):
+    """缺必填参数时 success=False 且 result 含错误说明"""
+    resp = await client.post("/api/tools/calculator/run", json={"args": {}})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is False
+    assert "expression" in data["result"]
+
+
+@pytest.mark.asyncio
+async def test_run_tool_not_found(client):
+    resp = await client.post("/api/tools/nope/run", json={"args": {}})
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_run_tool_high_risk_requires_confirm(client):
+    """高风险工具未确认时返回 400"""
+    resp = await client.post("/api/tools/execute_code/run", json={"args": {"code": "print(1)"}})
+    assert resp.status_code == 400
+    assert "high-risk" in resp.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_run_tool_high_risk_with_confirm(client):
+    """高风险工具确认后执行"""
+    resp = await client.post("/api/tools/execute_code/run", json={
+        "args": {"code": "print(1+1)"}, "confirm_high_risk": True,
+    })
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["success"] is True
+    assert "2" in data["result"]
+
+
+@pytest.mark.asyncio
+async def test_run_tool_records_metrics(client):
+    """运行后指标被记录"""
+    await client.post("/api/tools/uuid_generate/run", json={"args": {"count": 1}})
+    m = (await client.get("/api/tools/metrics")).json()
+    entry = [x for x in m if x["name"] == "uuid_generate"]
+    assert entry and entry[0]["calls"] == 1

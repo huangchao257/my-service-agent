@@ -182,6 +182,12 @@ export const api = {
     const q = qs.toString();
     return fetchJson<ToolInfo[]>(`/api/tools${q ? `?${q}` : ""}`);
   },
+  runTool: (name: string, args: Record<string, unknown>, confirmHighRisk = false) =>
+    fetchJson<{ success: boolean; result: string; duration_ms: number }>(
+      `/api/tools/${name}/run`,
+      { method: "POST", body: JSON.stringify({ args, confirm_high_risk: confirmHighRisk }) },
+    ),
+  toolMetrics: () => fetchJson<{ name: string; calls: number; errors: number; total_ms: number; avg_ms: number }[]>("/api/tools/metrics"),
   testProvider: (id: string) =>
     fetchJson<{ ok: boolean; detail: string }>(`/api/providers/${id}/test`, { method: "POST" }),
   refreshProviderModels: (id: string) =>
